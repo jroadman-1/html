@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fret Position Calculator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      padding: 2rem 1rem;
+      line-height: 1.6;
+      color: #333;
+    }
+    
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      margin-bottom: 1.5rem;
+    }
+    
+    h1 { 
+      font-size: 1.75rem;
+      color: #2c3e50;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    
+    .subtitle {
+      color: #7f8c8d;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .formula {
+      background: #ecf0f1;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.95rem;
+      color: #2c3e50;
+    }
+    
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    label { 
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: #2c3e50;
+      font-size: 0.95rem;
+    }
+    
+    select, input { 
+      width: 100%;
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      background: white;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+    
+    select:focus, input:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+    
+    select:hover, input:hover {
+      border-color: #bdc3c7;
+    }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    
+    button {
+      width: 100%;
+      padding: 0.875rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: white;
+      background: #3498db;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 0.5rem;
+    }
+    
+    button:hover {
+      background: #2980b9;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .button-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 0.5rem;
+    }
+    
+    .print-button {
+      background: #27ae60;
+    }
+    
+    .print-button:hover {
+      background: #229954;
+      box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+    }
+    
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      
+      .card {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        page-break-inside: avoid;
+      }
+      
+      .button-group,
+      button {
+        display: none !important;
+      }
+      
+      .result-table {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        page-break-inside: avoid;
+      }
+      
+      .subtitle {
+        color: #333;
+      }
+      
+      .formula {
+        border: 1px solid #ddd;
+      }
+    }
+    
+    .result-table { 
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      overflow-x: auto;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    th {
+      background: #3498db;
+      color: white;
+      padding: 0.875rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    
+    th:first-child {
+      border-radius: 8px 0 0 0;
+    }
+    
+    th:last-child {
+      border-radius: 0 8px 0 0;
+    }
+    
+    td {
+      padding: 0.75rem 0.875rem;
+      border-bottom: 1px solid #ecf0f1;
+      font-size: 0.95rem;
+    }
+    
+    tr:last-child td {
+      border-bottom: none;
+    }
+    
+    tr:nth-child(even) {
+      background: #f8f9fa;
+    }
+    
+    tr:hover {
+      background: #ecf9f2;
+    }
+    
+    .nut-row {
+      background: #fff3cd !important;
+      font-weight: 600;
+    }
+    
+    .error {
+      background: #fef5e7;
+      border: 2px solid #f39c12;
+      border-radius: 10px;
+      padding: 1.5rem;
+      color: #e67e22;
+      font-weight: 500;
+    }
+    
+    @media (max-width: 500px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .card {
+        padding: 1.5rem;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+      
+      th, td {
+        padding: 0.5rem;
+        font-size: 0.85rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Fret Position Calculator</h1>
+      <p class="subtitle">Calculate fret spacing using the 12th root of 2 method</p>
+      
+      <div class="formula">
+        d = s - (s / (2 ^ (n / 12)))
+      </div>
+      
+      <div class="grid">
+        <div class="form-group">
+          <label for="scaleLength">Scale Length</label>
+          <input type="number" id="scaleLength" step="0.01" min="0" placeholder="e.g., 25.5">
+        </div>
+        
+        <div class="form-group">
+          <label for="unit">Unit</label>
+          <select id="unit">
+            <option value="inches">Inches</option>
+            <option value="mm">Millimeters</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="numFrets">Number of Frets</label>
+        <input type="number" id="numFrets" min="1" max="36" value="24" placeholder="e.g., 24">
+      </div>
+      
+      <div class="button-group">
+        <button onclick="calculate()">Calculate Fret Positions</button>
+        <button class="print-button" onclick="printResults()" id="printBtn" style="display: none;">Print Results</button>
+      </div>
+    </div>
+    
+    <div id="output"></div>
+  </div>
+  
+  <script>
+    function calculate() {
+      const scaleLength = parseFloat(document.getElementById('scaleLength').value);
+      const numFrets = parseInt(document.getElementById('numFrets').value);
+      const unit = document.getElementById('unit').value;
+      const output = document.getElementById('output');
+      
+      if (isNaN(scaleLength) || scaleLength <= 0) {
+        output.innerHTML = '<div class="error">Please enter a valid scale length.</div>';
+        document.getElementById('printBtn').style.display = 'none';
+        return;
+      }
+      
+      if (isNaN(numFrets) || numFrets < 1 || numFrets > 36) {
+        output.innerHTML = '<div class="error">Please enter a number of frets between 1 and 36.</div>';
+        document.getElementById('printBtn').style.display = 'none';
+        return;
+      }
+      
+      let tableHTML = `
+        <div class="result-table">
+          <h2 style="margin-bottom: 1rem; color: #2c3e50;">Fret Positions</h2>
+          <p style="margin-bottom: 1rem; color: #7f8c8d;">
+            <strong>Scale Length:</strong> ${scaleLength} ${unit} | 
+            <strong>Number of Frets:</strong> ${numFrets}
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Fret #</th>
+                <th>Distance from Nut (${unit})</th>
+                <th>Distance from Previous (${unit})</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="nut-row">
+                <td>Nut</td>
+                <td>0.0000</td>
+                <td>—</td>
+              </tr>
+      `;
+      
+      let previousDistance = 0;
+      
+      for (let n = 1; n <= numFrets; n++) {
+        // Formula: d = s - (s / (2^(n/12)))
+        const distance = scaleLength - (scaleLength / Math.pow(2, n / 12));
+        const spacing = distance - previousDistance;
+        
+        tableHTML += `
+          <tr>
+            <td>${n}</td>
+            <td>${distance.toFixed(4)}</td>
+            <td>${spacing.toFixed(4)}</td>
+          </tr>
+        `;
+        
+        previousDistance = distance;
+      }
+      
+      tableHTML += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      output.innerHTML = tableHTML;
+      document.getElementById('printBtn').style.display = 'block';
+    }
+    
+    function printResults() {
+      window.print();
+    }
+  </script>
+</body>
+</html>
