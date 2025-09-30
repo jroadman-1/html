@@ -52,18 +52,17 @@
         return;
       }
 
-      let alcoholNeeded = 0;
       if (unit === "oz") {
-        // Correct formula: Alcohol (fl oz) = Flakes (oz) × (8 / cut)
-        alcoholNeeded = weight * (8 / cut);
+        // Ounce formula: Alcohol (fl oz) = Flakes (oz) × (8 / cut)
+        const alcoholNeeded = weight * (8 / cut);
         output.innerHTML = `
           For ${weight} oz of shellac at a ${cut} lb cut:<br>
           ➤ Alcohol required: <strong>${alcoholNeeded.toFixed(2)} fl oz</strong>
         `;
       } else if (unit === "g") {
-        // Formula: Alcohol (L) = grams / (cut × 454)
-        let liters = weight / (cut * 454);
-        let ml = liters * 1000;
+        // Gram formula: Alcohol (L) = (grams × 3.785) / (cut × 454)
+        const liters = (weight * 3.785) / (cut * 454);
+        const ml = liters * 1000;
         output.innerHTML = `
           For ${weight} g of shellac at a ${cut} lb cut:<br>
           ➤ Alcohol required: <strong>${liters.toFixed(3)} L</strong> (${ml.toFixed(1)} mL)
