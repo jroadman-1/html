@@ -60,8 +60,8 @@
           ➤ Alcohol required: <strong>${alcoholNeeded.toFixed(2)} fl oz</strong>
         `;
       } else if (unit === "g") {
-        // Gram formula: Alcohol (L) = (grams × 3.785) / (cut × 454)
-        const liters = (weight * 3.785) / (cut * 454);
+        // Gram formula: Alcohol (L) = (grams × 3.785) / (cut × 453.59)
+        const liters = (weight * 3.785) / (cut * 453.59);
         const ml = liters * 1000;
         output.innerHTML = `
           For ${weight} g of shellac at a ${cut} lb cut:<br>
