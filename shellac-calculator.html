@@ -54,15 +54,14 @@
 
       let alcoholNeeded = 0;
       if (unit === "oz") {
-        // Formula: (alcohol oz) = (shellac oz) × (16 / cut)
-        alcoholNeeded = weight * (16 / cut);
+        // Correct formula: Alcohol (fl oz) = Flakes (oz) × (8 / cut)
+        alcoholNeeded = weight * (8 / cut);
         output.innerHTML = `
           For ${weight} oz of shellac at a ${cut} lb cut:<br>
           ➤ Alcohol required: <strong>${alcoholNeeded.toFixed(2)} fl oz</strong>
         `;
       } else if (unit === "g") {
-        // Formula: 1 lb cut = 454 g flakes in 1 L alcohol
-        // So alcohol (L) = (grams / (cut × 454))
+        // Formula: Alcohol (L) = grams / (cut × 454)
         let liters = weight / (cut * 454);
         let ml = liters * 1000;
         output.innerHTML = `
