@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Shellac Cut Calculator</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; }
+    h1 { font-size: 1.5rem; }
+    label { display: block; margin-top: 1rem; }
+    select, input { margin-top: 0.25rem; }
+    .result { margin-top: 1.5rem; padding: 1rem; border: 1px solid #ccc; border-radius: 6px; background: #f9f9f9; }
+  </style>
+</head>
+<body>
+  <h1>Shellac Pound Cut Calculator</h1>
+  
+  <label>
+    Select pound cut:
+    <select id="cut">
+      <option value="1">1 lb cut</option>
+      <option value="2" selected>2 lb cut</option>
+      <option value="3">3 lb cut</option>
+    </select>
+  </label>
+  
+  <label>
+    Enter shellac weight:
+    <input type="number" id="weight" step="0.01" min="0">
+  </label>
+  
+  <label>
+    Select unit:
+    <select id="unit">
+      <option value="oz">Ounces (oz)</option>
+      <option value="g">Grams (g)</option>
+    </select>
+  </label>
+  
+  <button onclick="calculate()">Calculate</button>
+  
+  <div id="output" class="result"></div>
+  
+  <script>
+    function calculate() {
+      const cut = parseFloat(document.getElementById('cut').value);
+      const weight = parseFloat(document.getElementById('weight').value);
+      const unit = document.getElementById('unit').value;
+      const output = document.getElementById('output');
+      
+      if (isNaN(weight) || weight <= 0) {
+        output.innerHTML = "Please enter a valid shellac weight.";
+        return;
+      }
+
+      let alcoholNeeded = 0;
+      if (unit === "oz") {
+        // Formula: (alcohol oz) = (shellac oz) × (16 / cut)
+        alcoholNeeded = weight * (16 / cut);
+        output.innerHTML = `
+          For ${weight} oz of shellac at a ${cut} lb cut:<br>
+          ➤ Alcohol required: <strong>${alcoholNeeded.toFixed(2)} fl oz</strong>
+        `;
+      } else if (unit === "g") {
+        // Formula: 1 lb cut = 454 g flakes in 1 L alcohol
+        // So alcohol (L) = (grams / (cut × 454))
+        let liters = weight / (cut * 454);
+        let ml = liters * 1000;
+        output.innerHTML = `
+          For ${weight} g of shellac at a ${cut} lb cut:<br>
+          ➤ Alcohol required: <strong>${liters.toFixed(3)} L</strong> (${ml.toFixed(1)} mL)
+        `;
+      }
+    }
+  </script>
+</body>
+</html>
