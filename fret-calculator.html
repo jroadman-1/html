@@ -348,14 +348,7 @@
         const distance = scaleLength - (scaleLength / Math.pow(2, n / 12));
         const spacing = distance - previousDistance;
         
-        let description;
-        if (n === 1) {
-          description = "(From the nut to the 1st fret)";
-        } else {
-          const ordinal = n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`;
-          const prevOrdinal = (n-1) === 1 ? "1st" : (n-1) === 2 ? "2nd" : (n-1) === 3 ? "3rd" : `${n-1}th`;
-          description = `(From the ${prevOrdinal} fret to the ${ordinal} fret)`;
-        }
+        const description = n === 1 ? "(Nut - 1)" : `(${n-1} - ${n})`;
         
         calculatedData.frets.push({
           fretNum: n,
