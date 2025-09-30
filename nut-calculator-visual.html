@@ -552,16 +552,16 @@
                 posLineTop.setAttribute('x1', x);
                 posLineTop.setAttribute('y1', nutY - 10);
                 posLineTop.setAttribute('x2', x);
-                posLineTop.setAttribute('y2', 60);
+                posLineTop.setAttribute('y2', 95);
                 posLineTop.setAttribute('stroke', colors[i]);
                 posLineTop.setAttribute('stroke-width', '2');
                 posLineTop.setAttribute('stroke-dasharray', '3,3');
                 svg.appendChild(posLineTop);
                 
-                // Draw string label and gauge above
+                // Draw string label and gauge above (moved up higher, away from line)
                 const stringLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 stringLabel.setAttribute('x', x);
-                stringLabel.setAttribute('y', 75);
+                stringLabel.setAttribute('y', 65);
                 stringLabel.setAttribute('text-anchor', 'middle');
                 stringLabel.setAttribute('fill', '#2c3e50');
                 stringLabel.setAttribute('font-size', '13');
@@ -572,7 +572,7 @@
                 // Draw gauge label
                 const gaugeLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 gaugeLabel.setAttribute('x', x);
-                gaugeLabel.setAttribute('y', 90);
+                gaugeLabel.setAttribute('y', 80);
                 gaugeLabel.setAttribute('text-anchor', 'middle');
                 gaugeLabel.setAttribute('fill', '#7f8c8d');
                 gaugeLabel.setAttribute('font-size', '11');
@@ -605,12 +605,12 @@
                     const nextX = margin + (positions[i + 1] * scaleFactor);
                     const midX = (x + nextX) / 2;
                     
-                    // Draw gap bracket
+                    // Draw gap bracket (moved lower, below the nut)
                     const gapLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                     gapLine.setAttribute('x1', x + radius);
-                    gapLine.setAttribute('y1', nutY + nutHeight / 2 + 25);
+                    gapLine.setAttribute('y1', nutY + nutHeight + 15);
                     gapLine.setAttribute('x2', nextX - (baseRadius + (gauges[i + 1] * 50)));
-                    gapLine.setAttribute('y2', nutY + nutHeight / 2 + 25);
+                    gapLine.setAttribute('y2', nutY + nutHeight + 15);
                     gapLine.setAttribute('stroke', '#27ae60');
                     gapLine.setAttribute('stroke-width', '2');
                     svg.appendChild(gapLine);
@@ -618,9 +618,10 @@
                     // Calculate edge-to-edge distance
                     const edgeDistance = positions[i + 1] - positions[i] - (gauges[i] + gauges[i + 1]) / 2;
                     
+                    // Gap label moved down below the nut
                     const gapLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                     gapLabel.setAttribute('x', midX);
-                    gapLabel.setAttribute('y', nutY + nutHeight / 2 + 40);
+                    gapLabel.setAttribute('y', nutY + nutHeight + 30);
                     gapLabel.setAttribute('text-anchor', 'middle');
                     gapLabel.setAttribute('fill', '#27ae60');
                     gapLabel.setAttribute('font-size', '10');
