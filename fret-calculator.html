@@ -421,74 +421,76 @@
             
             .header {
               text-align: center;
-              margin-bottom: 1.5rem;
-              padding-bottom: 1rem;
-              border-bottom: 3px solid #3498db;
+              margin-bottom: 0.75rem;
+              padding-bottom: 0.5rem;
+              border-bottom: 2px solid #3498db;
             }
             
             h1 {
               color: #2c3e50;
-              font-size: 1.75rem;
-              margin-bottom: 0.5rem;
+              font-size: 1.3rem;
+              margin-bottom: 0.25rem;
             }
             
             .subtitle {
               color: #7f8c8d;
-              font-size: 0.95rem;
-              margin-bottom: 1rem;
+              font-size: 0.75rem;
+              margin-bottom: 0.5rem;
             }
             
             .formula {
               background: #ecf0f1;
-              padding: 0.75rem;
-              border-radius: 6px;
-              margin: 1rem 0;
+              padding: 0.4rem;
+              border-radius: 4px;
+              margin: 0.5rem 0;
               font-family: 'Courier New', monospace;
-              font-size: 0.9rem;
+              font-size: 0.75rem;
               color: #2c3e50;
               text-align: center;
             }
             
             .parameters {
               background: #ecf9f2;
-              padding: 1rem;
-              border-radius: 6px;
-              margin-bottom: 1.5rem;
-              border: 2px solid #27ae60;
+              padding: 0.5rem;
+              border-radius: 4px;
+              margin-bottom: 0.75rem;
+              border: 1px solid #27ae60;
+              font-size: 0.85rem;
             }
             
             .parameters p {
-              margin: 0.25rem 0;
+              margin: 0.15rem 0;
               color: #2c3e50;
             }
             
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-bottom: 1.5rem;
+              margin-bottom: 1rem;
+              font-size: 0.8rem;
             }
             
             th {
               background: #3498db;
               color: white;
-              padding: 0.75rem;
+              padding: 0.4rem 0.5rem;
               text-align: left;
               font-weight: 600;
-              font-size: 0.9rem;
+              font-size: 0.8rem;
             }
             
             td {
-              padding: 0.6rem 0.75rem;
+              padding: 0.3rem 0.5rem;
               border-bottom: 1px solid #ecf0f1;
-              font-size: 0.9rem;
+              font-size: 0.8rem;
             }
             
             .print-button {
               display: block;
-              width: 200px;
+              width: 180px;
               margin: 0 auto;
-              padding: 0.875rem 1.5rem;
-              font-size: 1rem;
+              padding: 0.7rem 1.2rem;
+              font-size: 0.95rem;
               font-weight: 600;
               color: white;
               background: #3498db;
@@ -508,7 +510,40 @@
               }
               
               body {
-                padding: 0;
+                padding: 0.25rem;
+                font-size: 10pt;
+              }
+              
+              h1 {
+                font-size: 14pt;
+              }
+              
+              .subtitle {
+                font-size: 8pt;
+              }
+              
+              .formula {
+                font-size: 9pt;
+                padding: 0.2rem;
+              }
+              
+              .parameters {
+                font-size: 9pt;
+                padding: 0.3rem;
+              }
+              
+              table {
+                font-size: 9pt;
+              }
+              
+              th {
+                padding: 0.2rem 0.3rem;
+                font-size: 9pt;
+              }
+              
+              td {
+                padding: 0.15rem 0.3rem;
+                font-size: 9pt;
               }
             }
           </style>
@@ -521,8 +556,7 @@
           </div>
           
           <div class="parameters">
-            <p><strong>Scale Length:</strong> ${data.scaleLength} ${data.unit}</p>
-            <p><strong>Number of Frets:</strong> ${data.numFrets}</p>
+            <p><strong>Scale Length:</strong> ${data.scaleLength} ${data.unit} | <strong>Number of Frets:</strong> ${data.numFrets}</p>
           </div>
           
           <table>
