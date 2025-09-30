@@ -329,12 +329,14 @@
                 <th>Fret #</th>
                 <th>Distance from Nut (${unit})</th>
                 <th>Distance from Previous (${unit})</th>
+                <th>Description</th>
               </tr>
             </thead>
             <tbody>
               <tr class="nut-row">
                 <td>Nut</td>
                 <td>0.000</td>
+                <td>—</td>
                 <td>—</td>
               </tr>
       `;
@@ -346,10 +348,20 @@
         const distance = scaleLength - (scaleLength / Math.pow(2, n / 12));
         const spacing = distance - previousDistance;
         
+        let description;
+        if (n === 1) {
+          description = "(From the nut to the 1st fret)";
+        } else {
+          const ordinal = n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`;
+          const prevOrdinal = (n-1) === 1 ? "1st" : (n-1) === 2 ? "2nd" : (n-1) === 3 ? "3rd" : `${n-1}th`;
+          description = `(From the ${prevOrdinal} fret to the ${ordinal} fret)`;
+        }
+        
         calculatedData.frets.push({
           fretNum: n,
           distance: distance,
-          spacing: spacing
+          spacing: spacing,
+          description: description
         });
         
         tableHTML += `
@@ -357,6 +369,7 @@
             <td>${n}</td>
             <td>${distance.toFixed(3)}</td>
             <td>${spacing.toFixed(3)}</td>
+            <td>${description}</td>
           </tr>
         `;
         
@@ -384,6 +397,7 @@
           <td>Nut</td>
           <td>0.000</td>
           <td>—</td>
+          <td>—</td>
         </tr>
       `;
       
@@ -394,6 +408,7 @@
             <td>${fret.fretNum}</td>
             <td>${fret.distance.toFixed(3)}</td>
             <td>${fret.spacing.toFixed(3)}</td>
+            <td>${fret.description}</td>
           </tr>
         `;
       });
@@ -565,6 +580,7 @@
                 <th>Fret #</th>
                 <th>Distance from Nut (${data.unit})</th>
                 <th>Distance from Previous (${data.unit})</th>
+                <th>Description</th>
               </tr>
             </thead>
             <tbody>
