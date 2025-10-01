@@ -731,14 +731,14 @@
                 
                 // String info above
                 svgContent += `
-                    <text x="${x}" y="${centerY - 40}" text-anchor="middle" font-size="10" font-weight="bold" fill="#2c3e50">
+                    <text x="${x}" y="${centerY - 40}" text-anchor="middle" font-size="8" font-weight="bold" fill="#2c3e50">
                         ${i + 1} (${notes[i]})
                     </text>
                 `;
                 
-                // Position below
+                // Position below (smaller font)
                 svgContent += `
-                    <text x="${x}" y="${centerY + 45}" text-anchor="middle" font-size="10" font-weight="bold" fill="#3498db">
+                    <text x="${x}" y="${centerY + 45}" text-anchor="middle" font-size="7" font-weight="bold" fill="#3498db">
                         ${positions[i].toFixed(3)}"
                     </text>
                 `;
