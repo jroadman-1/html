@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Nut Spacing Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.2em;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+
+        .input-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .input-group h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #34495e;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+            margin-bottom: 15px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .gauge-inputs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .gauge-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .gauge-input label {
+            min-width: 60px;
+            margin-bottom: 0;
+            font-size: 14px;
+        }
+
+        .gauge-input input {
+            margin-bottom: 0;
+            flex: 1;
+        }
+
+        .calculate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            margin: 20px 0;
+        }
+
+        .calculate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .results-content {
+            background: #2c3e50;
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            height: 100%;
+        }
+
+        .no-results {
+            background: #ecf0f1;
+            color: #7f8c8d;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .no-results h3 {
+            margin-bottom: 15px;
+            color: #95a5a6;
+        }
+
+        .results {
+            background: #2c3e50;
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        .results h3 {
+            margin-bottom: 20px;
+            color: #ecf0f1;
+            font-size: 1.3em;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: auto auto auto auto;
+            gap: 15px 30px;
+            align-items: center;
+        }
+
+        .results-header {
+            font-weight: 600;
+            color: #3498db;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #34495e;
+        }
+
+        .results-row {
+            padding: 8px 0;
+        }
+
+        .string-number {
+            font-weight: 600;
+            color: #e74c3c;
+        }
+
+        .measurement {
+            font-family: 'Courier New', monospace;
+            color: #2ecc71;
+            font-weight: 600;
+        }
+
+        .gap-info {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .gap-info strong {
+            color: #f39c12;
+        }
+
+        .visual-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 12px;
+            margin-top: 30px;
+        }
+
+        .visual-section h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.3em;
+        }
+
+        #nutDiagram {
+            width: 100%;
+            height: auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .input-section {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .gauge-inputs {
+                grid-template-columns: 1fr;
+            }
+            
+            .results-grid {
+                grid-template-columns: auto auto;
+                gap: 10px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Guitar Nut Spacing Calculator</h1>
+        <p class="subtitle">Calculate precise string positioning using center-to-center spacing</p>
+        
+        <div class="input-section">
+            <div class="input-group">
+                <h3>Inputs</h3>
+                <label for="totalSpacing">Outside Center-to-Center Distance (inches):</label>
+                <input type="number" id="totalSpacing" step="0.001" placeholder="e.g., 1.375" />
+                
+                <label for="gaugeType">Gauge Set:</label>
+                <select id="gaugeType">
+                    <option value="">Select a standard set...</option>
+                    <option value="electric-light">Electric Light (.009-.042)</option>
+                    <option value="electric-regular">Electric Regular (.010-.046)</option>
+                    <option value="electric-medium">Electric Medium (.011-.049)</option>
+                    <option value="electric-heavy">Electric Heavy (.012-.052)</option>
+                    <option value="acoustic-extra-light">Acoustic Extra Light (.010-.047)</option>
+                    <option value="acoustic-light">Acoustic Light (.012-.053)</option>
+                    <option value="acoustic-medium">Acoustic Medium (.013-.056)</option>
+                    <option value="acoustic-heavy">Acoustic Heavy (.014-.059)</option>
+                </select>
+                
+                <div class="gauge-inputs">
+                    <div class="gauge-input">
+                        <label>String 1:</label>
+                        <input type="number" id="gauge1" step="0.001" placeholder=".009" />
+                    </div>
+                    <div class="gauge-input">
+                        <label>String 2:</label>
+                        <input type="number" id="gauge2" step="0.001" placeholder=".011" />
+                    </div>
+                    <div class="gauge-input">
+                        <label>String 3:</label>
+                        <input type="number" id="gauge3" step="0.001" placeholder=".016" />
+                    </div>
+                    <div class="gauge-input">
+                        <label>String 4:</label>
+                        <input type="number" id="gauge4" step="0.001" placeholder=".024" />
+                    </div>
+                    <div class="gauge-input">
+                        <label>String 5:</label>
+                        <input type="number" id="gauge5" step="0.001" placeholder=".032" />
+                    </div>
+                    <div class="gauge-input">
+                        <label>String 6:</label>
+                        <input type="number" id="gauge6" step="0.001" placeholder=".042" />
+                    </div>
+                </div>
+                
+                <button class="calculate-btn" onclick="calculate()">Calculate String Positions</button>
+                <button class="calculate-btn" id="pdfBtn" onclick="generatePDF()" style="display: none; background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">Generate To-Scale PDF</button>
+            </div>
+            
+            <div class="input-group">
+                <div id="results" class="results-content hidden">
+                    <h3>String Positions from Zero Point</h3>
+                    <div class="results-grid" id="resultsGrid">
+                        <!-- Results will be populated here -->
+                    </div>
+                    <div class="gap-info" id="gapInfo">
+                        <!-- Gap information will be populated here -->
+                    </div>
+                </div>
+                <div id="noResults" class="no-results">
+                    <h3>Calculations</h3>
+                    <p>Enter spacing distance and string gauges, then click Calculate to see results.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="visualSection" class="visual-section hidden">
+            <h3>Nut Spacing Visualization</h3>
+            <svg id="nutDiagram" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+                <!-- SVG content will be generated dynamically -->
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        const standardGauges = {
+            'electric-light': [0.009, 0.011, 0.016, 0.024, 0.032, 0.042],
+            'electric-regular': [0.010, 0.013, 0.017, 0.026, 0.036, 0.046],
+            'electric-medium': [0.011, 0.014, 0.018, 0.028, 0.038, 0.049],
+            'electric-heavy': [0.012, 0.016, 0.020, 0.032, 0.042, 0.052],
+            'acoustic-extra-light': [0.010, 0.014, 0.023, 0.030, 0.039, 0.047],
+            'acoustic-light': [0.012, 0.016, 0.025, 0.032, 0.042, 0.053],
+            'acoustic-medium': [0.013, 0.017, 0.026, 0.035, 0.045, 0.056],
+            'acoustic-heavy': [0.014, 0.018, 0.027, 0.039, 0.049, 0.059]
+        };
+
+        document.getElementById('gaugeType').addEventListener('change', function() {
+            const selectedType = this.value;
+            
+            if (selectedType && standardGauges[selectedType]) {
+                const gauges = standardGauges[selectedType];
+                for (let i = 1; i <= 6; i++) {
+                    document.getElementById(`gauge${i}`).value = gauges[i-1];
+                }
+            }
+        });
+
+        function calculate() {
+            const totalSpacing = parseFloat(document.getElementById('totalSpacing').value);
+            
+            if (!totalSpacing || totalSpacing <= 0) {
+                alert('Please enter a valid total spacing distance.');
+                return;
+            }
+
+            // Get string gauges
+            let gauges = [];
+            for (let i = 1; i <= 6; i++) {
+                const gauge = parseFloat(document.getElementById(`gauge${i}`).value);
+                if (!gauge || gauge <= 0) {
+                    alert(`Please enter a valid gauge for string ${i}.`);
+                    return;
+                }
+                gauges.push(gauge);
+            }
+
+            // Apply the nut calculation equation
+            // g = (S - (d1/2 + d6/2) - sum(d2..d5)) / 5
+            const d1 = gauges[0];
+            const d6 = gauges[5];
+            const sumMiddleStrings = gauges[1] + gauges[2] + gauges[3] + gauges[4];
+            
+            const g = (totalSpacing - (d1/2 + d6/2) - sumMiddleStrings) / 5;
+
+            // Calculate string positions
+            const positions = [];
+            positions[0] = 0.000; // String 1 starts at zero
+
+            for (let i = 1; i < 6; i++) {
+                const prevPos = positions[i-1];
+                const prevDiameter = gauges[i-1];
+                const currentDiameter = gauges[i];
+                positions[i] = prevPos + (prevDiameter + currentDiameter) / 2 + g;
+            }
+
+            // Display results
+            displayResults(gauges, positions, g, totalSpacing);
+        }
+
+        function displayResults(gauges, positions, gap, totalSpacing) {
+            const resultsDiv = document.getElementById('results');
+            const noResultsDiv = document.getElementById('noResults');
+            const resultsGrid = document.getElementById('resultsGrid');
+            const gapInfo = document.getElementById('gapInfo');
+            const visualSection = document.getElementById('visualSection');
+            
+            resultsGrid.innerHTML = '';
+            
+            // Add headers
+            const headers = ['String', 'Gauge', 'Position', 'Note'];
+            const notes = ['High E', 'B', 'G', 'D', 'A', 'Low E'];
+            
+            headers.forEach(header => {
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'results-header';
+                headerDiv.textContent = header;
+                resultsGrid.appendChild(headerDiv);
+            });
+
+            // Add data rows
+            for (let i = 0; i < 6; i++) {
+                // String number
+                const stringDiv = document.createElement('div');
+                stringDiv.className = 'results-row string-number';
+                stringDiv.textContent = i + 1;
+                resultsGrid.appendChild(stringDiv);
+                
+                // Gauge
+                const gaugeDiv = document.createElement('div');
+                gaugeDiv.className = 'results-row';
+                gaugeDiv.textContent = gauges[i].toFixed(3) + '"';
+                resultsGrid.appendChild(gaugeDiv);
+                
+                // Position
+                const positionDiv = document.createElement('div');
+                positionDiv.className = 'results-row measurement';
+                positionDiv.textContent = positions[i].toFixed(3) + '"';
+                resultsGrid.appendChild(positionDiv);
+                
+                // Note
+                const noteDiv = document.createElement('div');
+                noteDiv.className = 'results-row';
+                noteDiv.textContent = notes[i];
+                resultsGrid.appendChild(noteDiv);
+            }
+
+            // Gap information
+            gapInfo.innerHTML = `<strong>Edge-to-edge gap between strings:</strong> ${gap.toFixed(3)}"`;
+            
+            // Show results, hide placeholder
+            noResultsDiv.classList.add('hidden');
+            resultsDiv.classList.remove('hidden');
+            
+            // Draw the nut diagram
+            drawNutDiagram(gauges, positions, totalSpacing, gap);
+            visualSection.classList.remove('hidden');
+            
+            // Show PDF button
+            document.getElementById('pdfBtn').style.display = 'block';
+            
+            // Store data globally for PDF generation
+            window.nutData = { gauges, positions, totalSpacing, gap };
+        }
+
+        function drawNutDiagram(gauges, positions, totalSpacing, gap) {
+            const svg = document.getElementById('nutDiagram');
+            svg.innerHTML = ''; // Clear previous diagram
+            
+            // SVG dimensions and scaling
+            const svgWidth = 800;
+            const svgHeight = 400;
+            const margin = 80;
+            const nutY = 180;
+            const nutHeight = 60;
+            
+            // Scale factor to fit all strings within the drawing area
+            const drawingWidth = svgWidth - 2 * margin;
+            const scaleFactor = drawingWidth / totalSpacing;
+            
+            // Draw nut background
+            const nutWidth = drawingWidth + 40;
+            const nutRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            nutRect.setAttribute('x', margin - 20);
+            nutRect.setAttribute('y', nutY - 10);
+            nutRect.setAttribute('width', nutWidth);
+            nutRect.setAttribute('height', nutHeight + 20);
+            nutRect.setAttribute('fill', '#d4a574');
+            nutRect.setAttribute('stroke', '#8b6f47');
+            nutRect.setAttribute('stroke-width', '3');
+            nutRect.setAttribute('rx', '5');
+            svg.appendChild(nutRect);
+            
+            // Add title
+            const title = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            title.setAttribute('x', svgWidth / 2);
+            title.setAttribute('y', 30);
+            title.setAttribute('text-anchor', 'middle');
+            title.setAttribute('fill', '#2c3e50');
+            title.setAttribute('font-size', '18');
+            title.setAttribute('font-weight', 'bold');
+            title.textContent = 'Nut View (Looking Down)';
+            svg.appendChild(title);
+            
+            // Draw zero reference line
+            const zeroLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            zeroLine.setAttribute('x1', margin);
+            zeroLine.setAttribute('y1', nutY - 30);
+            zeroLine.setAttribute('x2', margin);
+            zeroLine.setAttribute('y2', nutY + nutHeight + 30);
+            zeroLine.setAttribute('stroke', '#e74c3c');
+            zeroLine.setAttribute('stroke-width', '3');
+            zeroLine.setAttribute('stroke-dasharray', '5,5');
+            svg.appendChild(zeroLine);
+            
+            // Draw zero label
+            const zeroText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            zeroText.setAttribute('x', margin - 5);
+            zeroText.setAttribute('y', nutY - 35);
+            zeroText.setAttribute('text-anchor', 'end');
+            zeroText.setAttribute('fill', '#e74c3c');
+            zeroText.setAttribute('font-size', '14');
+            zeroText.setAttribute('font-weight', 'bold');
+            zeroText.textContent = 'Zero';
+            svg.appendChild(zeroText);
+            
+            const notes = ['E', 'B', 'G', 'D', 'A', 'E'];
+            const colors = ['#3498db', '#9b59b6', '#2ecc71', '#f39c12', '#e74c3c', '#34495e'];
+            
+            // Draw each string
+            for (let i = 0; i < 6; i++) {
+                const x = margin + (positions[i] * scaleFactor);
+                // Make string circles larger and more visible
+                const baseRadius = 8;
+                const radius = baseRadius + (gauges[i] * 50);
+                
+                // Draw string circle (larger and more visible)
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', x);
+                circle.setAttribute('cy', nutY + nutHeight / 2);
+                circle.setAttribute('r', radius);
+                circle.setAttribute('fill', colors[i]);
+                circle.setAttribute('stroke', '#2c3e50');
+                circle.setAttribute('stroke-width', '2');
+                svg.appendChild(circle);
+                
+                // Draw string number inside circle
+                const stringNum = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                stringNum.setAttribute('x', x);
+                stringNum.setAttribute('y', nutY + nutHeight / 2 + 5);
+                stringNum.setAttribute('text-anchor', 'middle');
+                stringNum.setAttribute('fill', 'white');
+                stringNum.setAttribute('font-size', '14');
+                stringNum.setAttribute('font-weight', 'bold');
+                stringNum.textContent = i + 1;
+                svg.appendChild(stringNum);
+                
+                // Draw vertical position line above
+                const posLineTop = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                posLineTop.setAttribute('x1', x);
+                posLineTop.setAttribute('y1', nutY - 10);
+                posLineTop.setAttribute('x2', x);
+                posLineTop.setAttribute('y2', 95);
+                posLineTop.setAttribute('stroke', colors[i]);
+                posLineTop.setAttribute('stroke-width', '2');
+                posLineTop.setAttribute('stroke-dasharray', '3,3');
+                svg.appendChild(posLineTop);
+                
+                // Draw string label and gauge above (moved up higher, away from line)
+                const stringLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                stringLabel.setAttribute('x', x);
+                stringLabel.setAttribute('y', 65);
+                stringLabel.setAttribute('text-anchor', 'middle');
+                stringLabel.setAttribute('fill', '#2c3e50');
+                stringLabel.setAttribute('font-size', '13');
+                stringLabel.setAttribute('font-weight', 'bold');
+                stringLabel.textContent = `String ${i + 1} (${notes[i]})`;
+                svg.appendChild(stringLabel);
+                
+                // Draw gauge label
+                const gaugeLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                gaugeLabel.setAttribute('x', x);
+                gaugeLabel.setAttribute('y', 80);
+                gaugeLabel.setAttribute('text-anchor', 'middle');
+                gaugeLabel.setAttribute('fill', '#7f8c8d');
+                gaugeLabel.setAttribute('font-size', '11');
+                gaugeLabel.textContent = `${gauges[i].toFixed(3)}"`;
+                svg.appendChild(gaugeLabel);
+                
+                // Draw vertical position line below
+                const posLineBottom = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                posLineBottom.setAttribute('x1', x);
+                posLineBottom.setAttribute('y1', nutY + nutHeight + 10);
+                posLineBottom.setAttribute('x2', x);
+                posLineBottom.setAttribute('y2', nutY + nutHeight + 35);
+                posLineBottom.setAttribute('stroke', colors[i]);
+                posLineBottom.setAttribute('stroke-width', '2');
+                svg.appendChild(posLineBottom);
+                
+                // Draw position label below
+                const posLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                posLabel.setAttribute('x', x);
+                posLabel.setAttribute('y', nutY + nutHeight + 50);
+                posLabel.setAttribute('text-anchor', 'middle');
+                posLabel.setAttribute('fill', colors[i]);
+                posLabel.setAttribute('font-size', '12');
+                posLabel.setAttribute('font-weight', 'bold');
+                posLabel.textContent = `${positions[i].toFixed(3)}"`;
+                svg.appendChild(posLabel);
+                
+                // Draw gap spacing between strings
+                if (i < 5) {
+                    const nextX = margin + (positions[i + 1] * scaleFactor);
+                    const midX = (x + nextX) / 2;
+                    
+                    // Draw gap bracket (moved lower, below the nut)
+                    const gapLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    gapLine.setAttribute('x1', x + radius);
+                    gapLine.setAttribute('y1', nutY + nutHeight + 15);
+                    gapLine.setAttribute('x2', nextX - (baseRadius + (gauges[i + 1] * 50)));
+                    gapLine.setAttribute('y2', nutY + nutHeight + 15);
+                    gapLine.setAttribute('stroke', '#27ae60');
+                    gapLine.setAttribute('stroke-width', '2');
+                    svg.appendChild(gapLine);
+                    
+                    // Calculate edge-to-edge distance
+                    const edgeDistance = positions[i + 1] - positions[i] - (gauges[i] + gauges[i + 1]) / 2;
+                    
+                    // Gap label moved down below the nut
+                    const gapLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    gapLabel.setAttribute('x', midX);
+                    gapLabel.setAttribute('y', nutY + nutHeight + 30);
+                    gapLabel.setAttribute('text-anchor', 'middle');
+                    gapLabel.setAttribute('fill', '#27ae60');
+                    gapLabel.setAttribute('font-size', '10');
+                    gapLabel.setAttribute('font-weight', 'bold');
+                    gapLabel.textContent = `Gap: ${edgeDistance.toFixed(3)}"`;
+                    svg.appendChild(gapLabel);
+                }
+            }
+            
+            // Draw total spacing dimension line at bottom
+            const totalX = margin + (totalSpacing * scaleFactor);
+            const dimY = nutY + nutHeight + 70;
+            
+            // Dimension line
+            const dimLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            dimLine.setAttribute('x1', margin);
+            dimLine.setAttribute('y1', dimY);
+            dimLine.setAttribute('x2', totalX);
+            dimLine.setAttribute('y2', dimY);
+            dimLine.setAttribute('stroke', '#e67e22');
+            dimLine.setAttribute('stroke-width', '3');
+            svg.appendChild(dimLine);
+            
+            // End arrows/ticks
+            const arrow1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            arrow1.setAttribute('x1', margin);
+            arrow1.setAttribute('y1', dimY - 8);
+            arrow1.setAttribute('x2', margin);
+            arrow1.setAttribute('y2', dimY + 8);
+            arrow1.setAttribute('stroke', '#e67e22');
+            arrow1.setAttribute('stroke-width', '3');
+            svg.appendChild(arrow1);
+            
+            const arrow2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            arrow2.setAttribute('x1', totalX);
+            arrow2.setAttribute('y1', dimY - 8);
+            arrow2.setAttribute('x2', totalX);
+            arrow2.setAttribute('y2', dimY + 8);
+            arrow2.setAttribute('stroke', '#e67e22');
+            arrow2.setAttribute('stroke-width', '3');
+            svg.appendChild(arrow2);
+            
+            // Total spacing label
+            const totalLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            totalLabel.setAttribute('x', (margin + totalX) / 2);
+            totalLabel.setAttribute('y', dimY + 22);
+            totalLabel.setAttribute('text-anchor', 'middle');
+            totalLabel.setAttribute('fill', '#e67e22');
+            totalLabel.setAttribute('font-size', '15');
+            totalLabel.setAttribute('font-weight', 'bold');
+            totalLabel.textContent = `Total Spacing: ${totalSpacing.toFixed(3)}"`;
+            svg.appendChild(totalLabel);
+        }
+        
+        function generatePDF() {
+            if (!window.nutData) return;
+            
+            const { gauges, positions, totalSpacing, gap } = window.nutData;
+            
+            // Open new window for PDF generation
+            const pdfWindow = window.open('', '_blank');
+            
+            // Convert inches to pixels at 96 DPI (standard screen DPI)
+            const dpi = 96;
+            const scale = dpi; // 1 inch = 96 pixels
+            
+            // Calculate dimensions
+            const nutLengthInches = totalSpacing + 0.5; // Add margins
+            const nutHeightInches = 1.5;
+            const pageWidthInches = Math.max(nutLengthInches + 2, 8.5);
+            const pageHeightInches = 11;
+            
+            const svgWidth = nutLengthInches * scale;
+            const svgHeight = nutHeightInches * scale;
+            const marginLeft = 1 * scale;
+            const marginTop = 2 * scale;
+            
+            const notes = ['E', 'B', 'G', 'D', 'A', 'E'];
+            
+            // Build SVG for to-scale diagram
+            let svgContent = `
+                <!-- Title -->
+                <text x="${pageWidthInches * scale / 2}" y="50" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50">
+                    Guitar Nut Spacing - To Scale Diagram
+                </text>
+                <text x="${pageWidthInches * scale / 2}" y="75" text-anchor="middle" font-size="14" fill="#7f8c8d">
+                    Print at 100% scale - Do not scale to fit
+                </text>
+                
+                <!-- Measurement info -->
+                <text x="${pageWidthInches * scale / 2}" y="100" text-anchor="middle" font-size="12" fill="#2c3e50">
+                    Total Center-to-Center Spacing: ${totalSpacing.toFixed(3)}" | Edge-to-Edge Gap: ${gap.toFixed(3)}"
+                </text>
+                
+                <!-- Scale reference -->
+                <rect x="${marginLeft}" y="120" width="${scale}" height="20" fill="none" stroke="#e74c3c" stroke-width="2"/>
+                <text x="${marginLeft + scale/2}" y="155" text-anchor="middle" font-size="10" fill="#e74c3c">
+                    1 inch reference
+                </text>
+                
+                <!-- Nut background -->
+                <rect x="${marginLeft}" y="${marginTop}" width="${svgWidth}" height="${svgHeight}" 
+                      fill="#d4a574" stroke="#8b6f47" stroke-width="3" rx="5"/>
+            `;
+            
+            // Draw strings at actual positions
+            for (let i = 0; i < 6; i++) {
+                const x = marginLeft + (positions[i] * scale);
+                const y = marginTop + svgHeight / 2;
+                const radius = (gauges[i] * scale / 2); // Actual size
+                
+                // String circle
+                svgContent += `
+                    <circle cx="${x}" cy="${y}" r="${Math.max(radius, 2)}" 
+                            fill="#34495e" stroke="#2c3e50" stroke-width="1"/>
+                `;
+                
+                // String label above
+                svgContent += `
+                    <line x1="${x}" y1="${marginTop - 5}" x2="${x}" y2="${marginTop - 30}" 
+                          stroke="#3498db" stroke-width="1" stroke-dasharray="2,2"/>
+                    <text x="${x}" y="${marginTop - 35}" text-anchor="middle" font-size="9" fill="#2c3e50">
+                        ${i + 1} (${notes[i]})
+                    </text>
+                    <text x="${x}" y="${marginTop - 23}" text-anchor="middle" font-size="8" fill="#7f8c8d">
+                        ${gauges[i].toFixed(3)}"
+                    </text>
+                `;
+                
+                // Position below
+                svgContent += `
+                    <line x1="${x}" y1="${marginTop + svgHeight + 5}" x2="${x}" y2="${marginTop + svgHeight + 20}" 
+                          stroke="#3498db" stroke-width="1"/>
+                    <text x="${x}" y="${marginTop + svgHeight + 33}" text-anchor="middle" font-size="9" font-weight="bold" fill="#3498db">
+                        ${positions[i].toFixed(3)}"
+                    </text>
+                `;
+            }
+            
+            // Zero reference line
+            svgContent += `
+                <line x1="${marginLeft}" y1="${marginTop - 40}" x2="${marginLeft}" y2="${marginTop + svgHeight + 40}" 
+                      stroke="#e74c3c" stroke-width="2" stroke-dasharray="5,5"/>
+                <text x="${marginLeft}" y="${marginTop - 45}" text-anchor="middle" font-size="10" font-weight="bold" fill="#e74c3c">
+                    Zero
+                </text>
+            `;
+            
+            // Total spacing dimension
+            const endX = marginLeft + (totalSpacing * scale);
+            const dimY = marginTop + svgHeight + 50;
+            svgContent += `
+                <line x1="${marginLeft}" y1="${dimY}" x2="${endX}" y2="${dimY}" 
+                      stroke="#e67e22" stroke-width="2"/>
+                <line x1="${marginLeft}" y1="${dimY - 5}" x2="${marginLeft}" y2="${dimY + 5}" 
+                      stroke="#e67e22" stroke-width="2"/>
+                <line x1="${endX}" y1="${dimY - 5}" x2="${endX}" y2="${dimY + 5}" 
+                      stroke="#e67e22" stroke-width="2"/>
+                <text x="${(marginLeft + endX) / 2}" y="${dimY + 15}" text-anchor="middle" 
+                      font-size="11" font-weight="bold" fill="#e67e22">
+                    ${totalSpacing.toFixed(3)}"
+                </text>
+            `;
+            
+            pdfWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Guitar Nut Spacing - To Scale</title>
+                    <style>
+                        @page {
+                            size: ${pageWidthInches}in ${pageHeightInches}in;
+                            margin: 0;
+                        }
+                        * {
+                            margin: 0;
+                            padding: 0;
+                            box-sizing: border-box;
+                        }
+                        body {
+                            font-family: Arial, sans-serif;
+                            background: white;
+                        }
+                        .container {
+                            width: ${pageWidthInches}in;
+                            height: ${pageHeightInches}in;
+                            position: relative;
+                        }
+                        .print-btn {
+                            position: fixed;
+                            top: 20px;
+                            right: 20px;
+                            padding: 12px 24px;
+                            background: #3498db;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: bold;
+                            cursor: pointer;
+                            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                        }
+                        .print-btn:hover {
+                            background: #2980b9;
+                        }
+                        @media print {
+                            .print-btn {
+                                display: none;
+                            }
+                        }
+                        svg {
+                            display: block;
+                        }
+                        .instructions {
+                            position: absolute;
+                            bottom: 20px;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            text-align: center;
+                            padding: 15px;
+                            background: #fff3cd;
+                            border: 2px solid #ffc107;
+                            border-radius: 8px;
+                        }
+                        @media print {
+                            .instructions {
+                                display: none;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <button class="print-btn" onclick="window.print()">Print This Page</button>
+                    
+                    <div class="container">
+                        <svg width="${pageWidthInches}in" height="${pageHeightInches}in" viewBox="0 0 ${pageWidthInches * scale} ${pageHeightInches * scale}" xmlns="http://www.w3.org/2000/svg">
+                            ${svgContent}
+                        </svg>
+                    </div>
+                    
+                    <div class="instructions">
+                        <strong>IMPORTANT:</strong> When printing, select "Actual Size" or "100%" scale.<br>
+                        Do NOT select "Fit to Page" or "Scale to Fit".<br>
+                        This will ensure accurate 1:1 measurements.
+                    </div>
+                </body>
+                </html>
+            `);
+            
+            pdfWindow.document.close();
+        }
+    </script>
+</body>
+</html>
