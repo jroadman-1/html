@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neck Shim Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: 40px auto;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    label, input {
+      display: block;
+      margin-bottom: 10px;
+    }
+    input[type="number"] {
+      width: 100%;
+      padding: 8px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #result {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    .unit-toggle {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Neck Shim Calculator</h2>
+
+  <div class="unit-toggle">
+    <label><input type="radio" name="unit" value="in" checked onchange="updateLabels()"> Inches</label>
+    <label><input type="radio" name="unit" value="mm" onchange="updateLabels()"> Millimeters</label>
+  </div>
+
+  <label for="neckPocket" id="label-neckPocket">Neck Pocket Length (inches):</label>
+  <input type="number" id="neckPocket" step="0.001" />
+
+  <label for="distanceToBridge" id="label-distanceToBridge">Distance from End of Neck Pocket to Bridge (inches):</label>
+  <input type="number" id="distanceToBridge" step="0.001" />
+
+  <label for="desiredRise" id="label-desiredRise">Desired Rise at Bridge (inches):</label>
+  <input type="number" id="desiredRise" step="0.001" />
+
+  <button onclick="calculateShim()">Calculate Shim Thickness</button>
+
+  <div id="result"></div>
+
+  <script>
+    function getUnit() {
+      return document.querySelector('input[name="unit"]:checked').value;
+    }
+
+    function updateLabels() {
+      const unit = getUnit();
+      document.getElementById('label-neckPocket').innerText = `Neck Pocket Length (${unit}):`;
+      document.getElementById('label-distanceToBridge').innerText = `Distance from Neck Pocket to Bridge (${unit}):`;
+      document.getElementById('label-desiredRise').innerText = `Desired Rise at Bridge (${unit}):`;
+    }
+
+    function calculateShim() {
+      const unit = getUnit();
+      let neckPocket = parseFloat(document.getElementById('neckPocket').value);
+      let distanceToBridge = parseFloat(document.getElementById('distanceToBridge').value);
+      let desiredRise = parseFloat(document.getElementById('desiredRise').value);
+
+      if (unit === 'mm') {
+        neckPocket /= 25.4;
+        distanceToBridge /= 25.4;
+        desiredRise /= 25.4;
+      }
+
+      if (isNaN(neckPocket) || isNaN(distanceToBridge) || isNaN(desiredRise)) {
+        document.getElementById('result').innerText = 'Please enter valid numbers in all fields.';
+        return;
+      }
+
+      const totalDistance = neckPocket + distanceToBridge;
+      const angleRadians = Math.atan(desiredRise / totalDistance);
+      const angleDegrees = angleRadians * (180 / Math.PI);
+      const shimThicknessInches = Math.tan(angleRadians) * neckPocket;
+      const shimThickness = unit === 'mm' ? shimThicknessInches * 25.4 : shimThicknessInches;
+
+      document.getElementById('result').innerText = 
+        `Required shim thickness: ${shimThickness.toFixed(5)} ${unit}\n` +
+        `Shim angle: ${angleDegrees.toFixed(4)}°`;
+    }
+  </script>
+</body>
+</html>
