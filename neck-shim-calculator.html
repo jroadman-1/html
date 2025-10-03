@@ -282,8 +282,8 @@
                 </div>
 
                 <div class="input-group">
-                    <label for="desiredRise" id="label-desiredRise">Desired Rise at Bridge (in):</label>
-                    <input type="number" id="desiredRise" step="0.001" placeholder="Enter rise">
+                    <label for="desiredRise" id="label-desiredRise">Change at 12th Fret (in):</label>
+                    <input type="number" id="desiredRise" step="0.001" placeholder="Enter change">
                 </div>
 
                 <button class="calculate-btn" onclick="calculateShim()">Calculate Shim Thickness</button>
@@ -311,30 +311,33 @@
             const unit = getUnit();
             document.getElementById('label-neckPocket').innerText = `Neck Pocket Length (${unit}):`;
             document.getElementById('label-distanceToBridge').innerText = `Distance from End of Neck Pocket to Bridge (${unit}):`;
-            document.getElementById('label-desiredRise').innerText = `Desired Rise at Bridge (${unit}):`;
+            document.getElementById('label-desiredRise').innerText = `Change at 12th Fret (${unit}):`;
         }
 
         function calculateShim() {
             const unit = getUnit();
             let neckPocket = parseFloat(document.getElementById('neckPocket').value);
             let distanceToBridge = parseFloat(document.getElementById('distanceToBridge').value);
-            let desiredRise = parseFloat(document.getElementById('desiredRise').value);
+            let changeAt12thFret = parseFloat(document.getElementById('desiredRise').value);
 
-            if (isNaN(neckPocket) || isNaN(distanceToBridge) || isNaN(desiredRise)) {
+            if (isNaN(neckPocket) || isNaN(distanceToBridge) || isNaN(changeAt12thFret)) {
                 document.getElementById('results-container').innerHTML = 
                     '<p style="color: #e74c3c; text-align: center;">Please enter valid numbers in all fields.</p>';
                 return;
             }
 
             // Store original values for display
-            const displayValues = { neckPocket, distanceToBridge, desiredRise };
+            const displayValues = { neckPocket, distanceToBridge, changeAt12thFret };
 
             // Convert to inches for calculation if needed
             if (unit === 'mm') {
                 neckPocket /= 25.4;
                 distanceToBridge /= 25.4;
-                desiredRise /= 25.4;
+                changeAt12thFret /= 25.4;
             }
+
+            // Double the change at 12th fret to get the change at bridge
+            const desiredRise = changeAt12thFret * 2;
 
             const totalDistance = neckPocket + distanceToBridge;
             const angleRadians = Math.atan(desiredRise / totalDistance);
@@ -351,6 +354,10 @@
                 <div class="result-item">
                     <div class="result-label">Shim Angle</div>
                     <div class="result-value">${angleDegrees.toFixed(3)}°</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Change at Bridge</div>
+                    <div class="result-value">${(unit === 'mm' ? desiredRise * 25.4 : desiredRise).toFixed(3)} ${unit}</div>
                 </div>
                 <div class="result-item">
                     <div class="result-label">Total Distance</div>
