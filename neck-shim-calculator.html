@@ -1,101 +1,363 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Neck Shim Calculator</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 500px;
-      margin: 40px auto;
-      padding: 20px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
-    }
-    label, input {
-      display: block;
-      margin-bottom: 10px;
-    }
-    input[type="number"] {
-      width: 100%;
-      padding: 8px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    #result {
-      margin-top: 20px;
-      font-weight: bold;
-    }
-    .unit-toggle {
-      margin-bottom: 20px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neck Shim Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.2em;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+
+        .unit-toggle {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            text-align: center;
+            border-left: 4px solid #3498db;
+        }
+
+        .unit-toggle label {
+            display: inline-block;
+            margin: 0 15px;
+            cursor: pointer;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .unit-toggle input[type="radio"] {
+            margin-right: 5px;
+            cursor: pointer;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .input-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .input-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #34495e;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .input-group input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .input-group input[type="number"]:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .calculate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .calculate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .calculate-btn:active {
+            transform: translateY(0);
+        }
+
+        .results-section {
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px solid #e9ecef;
+        }
+
+        .results-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+
+        .result-item {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .result-label {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            color: #2c3e50;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .visual-container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            border: 2px solid #e9ecef;
+            margin-top: 30px;
+        }
+
+        .visual-container h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.3em;
+        }
+
+        .diagram {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .neck-pocket {
+            position: absolute;
+            bottom: 100px;
+            left: 50px;
+            background: linear-gradient(to right, #8b5a3c, #6d4c3a);
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .shim {
+            position: absolute;
+            bottom: 100px;
+            left: 50px;
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            border: 2px solid #f39c12;
+            transform-origin: bottom left;
+        }
+
+        .bridge-line {
+            position: absolute;
+            bottom: 100px;
+            width: 4px;
+            background: #e74c3c;
+            box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+        }
+
+        .measurement-line {
+            position: absolute;
+            border-top: 2px dashed #3498db;
+            color: #3498db;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .measurement-label {
+            position: absolute;
+            background: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #3498db;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+
+        .angle-arc {
+            position: absolute;
+            bottom: 100px;
+            left: 50px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .diagram {
+                height: 250px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <h2>Neck Shim Calculator</h2>
+    <div class="container">
+        <h1>Neck Shim Calculator</h1>
+        <p class="subtitle">Calculate precise shim thickness for bolt-on guitar necks</p>
 
-  <div class="unit-toggle">
-    <label><input type="radio" name="unit" value="in" checked onchange="updateLabels()"> Inches</label>
-    <label><input type="radio" name="unit" value="mm" onchange="updateLabels()"> Millimeters</label>
-  </div>
+        <div class="unit-toggle">
+            <label>
+                <input type="radio" name="unit" value="in" checked onchange="updateLabels()">
+                Inches
+            </label>
+            <label>
+                <input type="radio" name="unit" value="mm" onchange="updateLabels()">
+                Millimeters
+            </label>
+        </div>
 
-  <label for="neckPocket" id="label-neckPocket">Neck Pocket Length (inches):</label>
-  <input type="number" id="neckPocket" step="0.001" />
+        <div class="main-content">
+            <div class="input-section">
+                <h2>Input Measurements</h2>
+                
+                <div class="input-group">
+                    <label for="neckPocket" id="label-neckPocket">Neck Pocket Length (in):</label>
+                    <input type="number" id="neckPocket" step="0.001" placeholder="Enter length">
+                </div>
 
-  <label for="distanceToBridge" id="label-distanceToBridge">Distance from End of Neck Pocket to Bridge (inches):</label>
-  <input type="number" id="distanceToBridge" step="0.001" />
+                <div class="input-group">
+                    <label for="distanceToBridge" id="label-distanceToBridge">Distance from End of Neck Pocket to Bridge (in):</label>
+                    <input type="number" id="distanceToBridge" step="0.001" placeholder="Enter distance">
+                </div>
 
-  <label for="desiredRise" id="label-desiredRise">Desired Rise at Bridge (inches):</label>
-  <input type="number" id="desiredRise" step="0.001" />
+                <div class="input-group">
+                    <label for="desiredRise" id="label-desiredRise">Desired Rise at Bridge (in):</label>
+                    <input type="number" id="desiredRise" step="0.001" placeholder="Enter rise">
+                </div>
 
-  <button onclick="calculateShim()">Calculate Shim Thickness</button>
+                <button class="calculate-btn" onclick="calculateShim()">Calculate Shim Thickness</button>
+            </div>
 
-  <div id="result"></div>
+            <div class="results-section">
+                <h2>Results</h2>
+                <div id="results-container">
+                    <p style="color: #7f8c8d; text-align: center; padding: 40px 0;">
+                        Enter measurements and click Calculate to see results
+                    </p>
+                </div>
+            </div>
+        </div>
 
-  <script>
-    function getUnit() {
-      return document.querySelector('input[name="unit"]:checked').value;
-    }
 
-    function updateLabels() {
-      const unit = getUnit();
-      document.getElementById('label-neckPocket').innerText = `Neck Pocket Length (${unit}):`;
-      document.getElementById('label-distanceToBridge').innerText = `Distance from Neck Pocket to Bridge (${unit}):`;
-      document.getElementById('label-desiredRise').innerText = `Desired Rise at Bridge (${unit}):`;
-    }
+    </div>
 
-    function calculateShim() {
-      const unit = getUnit();
-      let neckPocket = parseFloat(document.getElementById('neckPocket').value);
-      let distanceToBridge = parseFloat(document.getElementById('distanceToBridge').value);
-      let desiredRise = parseFloat(document.getElementById('desiredRise').value);
+    <script>
+        function getUnit() {
+            return document.querySelector('input[name="unit"]:checked').value;
+        }
 
-      if (unit === 'mm') {
-        neckPocket /= 25.4;
-        distanceToBridge /= 25.4;
-        desiredRise /= 25.4;
-      }
+        function updateLabels() {
+            const unit = getUnit();
+            document.getElementById('label-neckPocket').innerText = `Neck Pocket Length (${unit}):`;
+            document.getElementById('label-distanceToBridge').innerText = `Distance from End of Neck Pocket to Bridge (${unit}):`;
+            document.getElementById('label-desiredRise').innerText = `Desired Rise at Bridge (${unit}):`;
+        }
 
-      if (isNaN(neckPocket) || isNaN(distanceToBridge) || isNaN(desiredRise)) {
-        document.getElementById('result').innerText = 'Please enter valid numbers in all fields.';
-        return;
-      }
+        function calculateShim() {
+            const unit = getUnit();
+            let neckPocket = parseFloat(document.getElementById('neckPocket').value);
+            let distanceToBridge = parseFloat(document.getElementById('distanceToBridge').value);
+            let desiredRise = parseFloat(document.getElementById('desiredRise').value);
 
-      const totalDistance = neckPocket + distanceToBridge;
-      const angleRadians = Math.atan(desiredRise / totalDistance);
-      const angleDegrees = angleRadians * (180 / Math.PI);
-      const shimThicknessInches = Math.tan(angleRadians) * neckPocket;
-      const shimThickness = unit === 'mm' ? shimThicknessInches * 25.4 : shimThicknessInches;
+            if (isNaN(neckPocket) || isNaN(distanceToBridge) || isNaN(desiredRise)) {
+                document.getElementById('results-container').innerHTML = 
+                    '<p style="color: #e74c3c; text-align: center;">Please enter valid numbers in all fields.</p>';
+                return;
+            }
 
-      document.getElementById('result').innerText = 
-        `Required shim thickness: ${shimThickness.toFixed(5)} ${unit}\n` +
-        `Shim angle: ${angleDegrees.toFixed(4)}°`;
-    }
-  </script>
+            // Store original values for display
+            const displayValues = { neckPocket, distanceToBridge, desiredRise };
+
+            // Convert to inches for calculation if needed
+            if (unit === 'mm') {
+                neckPocket /= 25.4;
+                distanceToBridge /= 25.4;
+                desiredRise /= 25.4;
+            }
+
+            const totalDistance = neckPocket + distanceToBridge;
+            const angleRadians = Math.atan(desiredRise / totalDistance);
+            const angleDegrees = angleRadians * (180 / Math.PI);
+            const shimThicknessInches = Math.tan(angleRadians) * neckPocket;
+            const shimThickness = unit === 'mm' ? shimThicknessInches * 25.4 : shimThicknessInches;
+
+            // Display results
+            document.getElementById('results-container').innerHTML = `
+                <div class="result-item">
+                    <div class="result-label">Required Shim Thickness</div>
+                    <div class="result-value">${shimThickness.toFixed(3)} ${unit}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Shim Angle</div>
+                    <div class="result-value">${angleDegrees.toFixed(3)}°</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Total Distance</div>
+                    <div class="result-value">${(unit === 'mm' ? totalDistance * 25.4 : totalDistance).toFixed(3)} ${unit}</div>
+                </div>
+            `;
+        }
+    </script>
 </body>
 </html>
