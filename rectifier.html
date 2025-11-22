@@ -596,47 +596,51 @@ fileInput.addEventListener('change', (e) => {
         
         points = [];
         
-        const containerW = canvasContainer.clientWidth;
-        const containerH = canvasContainer.clientHeight;
-        console.log('Container size:', containerW, 'x', containerH);
-        
-        minScale = Math.min(containerW / naturalW, containerH / naturalH);
-        scale = minScale;
-        
-        // Center the image in the container
-        const scaledW = naturalW * scale;
-        const scaledH = naturalH * scale;
-        panX = Math.max(0, (containerW - scaledW) / 2);
-        panY = Math.max(0, (containerH - scaledH) / 2);
-        
-        console.log(`Initial scale: ${scale.toFixed(3)}, min scale: ${minScale.toFixed(3)}`);
-        console.log(`Initial pan: (${panX.toFixed(1)}, ${panY.toFixed(1)})`);
-        console.log(`Scaled image size: ${scaledW.toFixed(1)} x ${scaledH.toFixed(1)}`);
-        
-        // Set canvas dimensions BEFORE showing it
-        canvas.width = naturalW;
-        canvas.height = naturalH;
-        console.log('Canvas dimensions set:', canvas.width, 'x', canvas.height);
-        
-        // CRITICAL: Set wrapper dimensions explicitly
-        canvasWrapper.style.width = naturalW + 'px';
-        canvasWrapper.style.height = naturalH + 'px';
-        console.log('Wrapper dimensions set');
-        
-        // Draw image to canvas using OpenCV
-        cv.imshow(canvas, srcImage);
-        console.log('Image drawn to canvas');
-        
+        // CRITICAL: Make container active FIRST so we can get its real dimensions
         console.log('Making canvas container active...');
         canvasContainer.classList.add('active');
         
-        console.log('Calling drawCanvas...');
-        drawCanvas();
-        
-        console.log('Calling updateMarkers...');
-        updateMarkers();
-        
-        console.log('✓ Setup complete');
+        // Now get the container dimensions (wait a moment for layout)
+        setTimeout(() => {
+          const containerW = canvasContainer.clientWidth;
+          const containerH = canvasContainer.clientHeight;
+          console.log('Container size:', containerW, 'x', containerH);
+          
+          minScale = Math.min(containerW / naturalW, containerH / naturalH);
+          scale = minScale;
+          
+          // Center the image in the container
+          const scaledW = naturalW * scale;
+          const scaledH = naturalH * scale;
+          panX = Math.max(0, (containerW - scaledW) / 2);
+          panY = Math.max(0, (containerH - scaledH) / 2);
+          
+          console.log(`Initial scale: ${scale.toFixed(3)}, min scale: ${minScale.toFixed(3)}`);
+          console.log(`Initial pan: (${panX.toFixed(1)}, ${panY.toFixed(1)})`);
+          console.log(`Scaled image size: ${scaledW.toFixed(1)} x ${scaledH.toFixed(1)}`);
+          
+          // Set canvas dimensions BEFORE showing it
+          canvas.width = naturalW;
+          canvas.height = naturalH;
+          console.log('Canvas dimensions set:', canvas.width, 'x', canvas.height);
+          
+          // CRITICAL: Set wrapper dimensions explicitly
+          canvasWrapper.style.width = naturalW + 'px';
+          canvasWrapper.style.height = naturalH + 'px';
+          console.log('Wrapper dimensions set');
+          
+          // Draw image to canvas using OpenCV
+          cv.imshow(canvas, srcImage);
+          console.log('Image drawn to canvas');
+          
+          console.log('Calling drawCanvas...');
+          drawCanvas();
+          
+          console.log('Calling updateMarkers...');
+          updateMarkers();
+          
+          console.log('✓ Setup complete');
+        }, 10);
         
       } catch (err) {
         console.error('Error in image loading try block:', err);
@@ -907,33 +911,43 @@ rectifyBtn.addEventListener('click', () => {
     // Show step 2
     step2.classList.remove('hidden');
     
-    // Setup align canvas
-    alignNaturalW = rectifiedImage.cols;
-    alignNaturalH = rectifiedImage.rows;
-    alignCanvas.width = alignNaturalW;
-    alignCanvas.height = alignNaturalH;
-    
-    // CRITICAL: Set wrapper dimensions explicitly
-    alignCanvasWrapper.style.width = alignNaturalW + 'px';
-    alignCanvasWrapper.style.height = alignNaturalH + 'px';
-    
-    cv.imshow(alignCanvas, rectifiedImage);
-    
-    alignPoints = [];
-    alignScale = 1;
-    alignPanX = 0;
-    alignPanY = 0;
-    
-    const containerW = alignCanvasContainer.clientWidth;
-    const containerH = alignCanvasContainer.clientHeight;
-    alignMinScale = Math.min(containerW / alignNaturalW, containerH / alignNaturalH);
-    alignScale = alignMinScale;
-    
+    // CRITICAL: Make align container active FIRST
     alignCanvasContainer.classList.add('active');
-    drawAlignCanvas();
-    updateAlignMarkers();
     
-    step2.scrollIntoView({ behavior: 'smooth' });
+    // Setup align canvas - wait for layout
+    setTimeout(() => {
+      alignNaturalW = rectifiedImage.cols;
+      alignNaturalH = rectifiedImage.rows;
+      alignCanvas.width = alignNaturalW;
+      alignCanvas.height = alignNaturalH;
+      
+      // CRITICAL: Set wrapper dimensions explicitly
+      alignCanvasWrapper.style.width = alignNaturalW + 'px';
+      alignCanvasWrapper.style.height = alignNaturalH + 'px';
+      
+      cv.imshow(alignCanvas, rectifiedImage);
+      
+      alignPoints = [];
+      alignScale = 1;
+      alignPanX = 0;
+      alignPanY = 0;
+      
+      const containerW = alignCanvasContainer.clientWidth;
+      const containerH = alignCanvasContainer.clientHeight;
+      alignMinScale = Math.min(containerW / alignNaturalW, containerH / alignNaturalH);
+      alignScale = alignMinScale;
+      
+      // Center the image
+      const scaledW = alignNaturalW * alignScale;
+      const scaledH = alignNaturalH * alignScale;
+      alignPanX = Math.max(0, (containerW - scaledW) / 2);
+      alignPanY = Math.max(0, (containerH - scaledH) / 2);
+      
+      drawAlignCanvas();
+      updateAlignMarkers();
+      
+      step2.scrollIntoView({ behavior: 'smooth' });
+    }, 10);
     
   } catch (err) {
     alert('Error during rectification: ' + err.message);
