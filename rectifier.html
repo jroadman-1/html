@@ -619,6 +619,22 @@ fileInput.addEventListener('change', (e) => {
         console.log('Calling drawCanvas...');
         drawCanvas();
         
+        // Force multiple redraws to ensure canvas appears
+        setTimeout(() => {
+          console.log('Forced redraw 1');
+          drawCanvas();
+        }, 10);
+        
+        setTimeout(() => {
+          console.log('Forced redraw 2');
+          drawCanvas();
+        }, 100);
+        
+        setTimeout(() => {
+          console.log('Forced redraw 3');
+          drawCanvas();
+        }, 500);
+        
         console.log('Calling updateMarkers...');
         updateMarkers();
         
@@ -783,14 +799,37 @@ canvasContainer.addEventListener('mousemove', (e) => {
 });
 
 canvasContainer.addEventListener('mouseup', (e) => {
+  console.log('mouseup event:', { 
+    dragMoved, 
+    shiftHeld, 
+    naturalW, 
+    pointsLength: points.length,
+    clientX: e.clientX,
+    clientY: e.clientY
+  });
+  
   canvasContainer.classList.remove('grabbing');
   
   if (!dragMoved && shiftHeld && naturalW && points.length < 4) {
+    console.log('Attempting to add point...');
     const coords = screenToCanvas(e.clientX, e.clientY);
+    console.log('Calculated coords:', coords);
+    
     if (coords.x >= 0 && coords.x <= naturalW && coords.y >= 0 && coords.y <= naturalH) {
+      console.log('Coords valid, adding point');
       points.push(coords);
+      console.log('Points array now:', points);
       updateMarkers();
+    } else {
+      console.log('Coords out of bounds:', { 
+        x: coords.x, 
+        y: coords.y, 
+        maxX: naturalW, 
+        maxY: naturalH 
+      });
     }
+  } else {
+    console.log('Click conditions not met');
   }
   
   isDragging = false;
