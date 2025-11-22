@@ -697,6 +697,11 @@ function drawCanvas() {
 
 function updateMarkers() {
   markersContainer.innerHTML = '';
+  
+  // Apply the same transform as the canvas so markers stay in sync
+  markersContainer.style.width = naturalW + 'px';
+  markersContainer.style.height = naturalH + 'px';
+  
   points.forEach((p, i) => {
     const marker = document.createElement('div');
     marker.className = 'marker';
@@ -936,14 +941,44 @@ function orderCorners(pts) {
 
 // Align canvas functions
 function drawAlignCanvas() {
-  if (!rectifiedImage) return;
+  console.log('drawAlignCanvas called');
   
-  alignCanvasWrapper.style.transform = `translate(${alignPanX}px, ${alignPanY}px) scale(${alignScale})`;
-  alignMarkersContainer.style.transform = alignCanvasWrapper.style.transform;
+  if (!rectifiedImage) {
+    console.error('drawAlignCanvas: rectifiedImage is null!');
+    return;
+  }
+  
+  // Guard against invalid values
+  if (!isFinite(alignPanX) || !isFinite(alignPanY) || !isFinite(alignScale)) {
+    console.error('Invalid align transform values detected!', { alignPanX, alignPanY, alignScale });
+    console.error('Resetting to safe defaults...');
+    
+    const containerW = alignCanvasContainer.clientWidth;
+    const containerH = alignCanvasContainer.clientHeight;
+    alignMinScale = Math.min(containerW / alignNaturalW, containerH / alignNaturalH);
+    alignScale = alignMinScale;
+    
+    const scaledW = alignNaturalW * alignScale;
+    const scaledH = alignNaturalH * alignScale;
+    alignPanX = Math.max(0, (containerW - scaledW) / 2);
+    alignPanY = Math.max(0, (containerH - scaledH) / 2);
+    
+    console.log('Reset align to:', { alignPanX, alignPanY, alignScale });
+  }
+  
+  const transform = `translate(${alignPanX}px, ${alignPanY}px) scale(${alignScale})`;
+  console.log('Applying align transform:', transform);
+  alignCanvasWrapper.style.transform = transform;
+  alignMarkersContainer.style.transform = transform;
 }
 
 function updateAlignMarkers() {
   alignMarkersContainer.innerHTML = '';
+  
+  // Apply the same transform as the canvas so markers stay in sync
+  alignMarkersContainer.style.width = alignNaturalW + 'px';
+  alignMarkersContainer.style.height = alignNaturalH + 'px';
+  
   alignPoints.forEach((p, i) => {
     const marker = document.createElement('div');
     marker.className = 'marker align-marker';
