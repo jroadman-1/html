@@ -595,9 +595,6 @@ fileInput.addEventListener('change', (e) => {
         console.log(`✓ Image loaded: ${naturalW} x ${naturalH}`);
         
         points = [];
-        scale = 1;
-        panX = 0;
-        panY = 0;
         
         const containerW = canvasContainer.clientWidth;
         const containerH = canvasContainer.clientHeight;
@@ -606,7 +603,15 @@ fileInput.addEventListener('change', (e) => {
         minScale = Math.min(containerW / naturalW, containerH / naturalH);
         scale = minScale;
         
+        // Center the image in the container
+        const scaledW = naturalW * scale;
+        const scaledH = naturalH * scale;
+        panX = Math.max(0, (containerW - scaledW) / 2);
+        panY = Math.max(0, (containerH - scaledH) / 2);
+        
         console.log(`Initial scale: ${scale.toFixed(3)}, min scale: ${minScale.toFixed(3)}`);
+        console.log(`Initial pan: (${panX.toFixed(1)}, ${panY.toFixed(1)})`);
+        console.log(`Scaled image size: ${scaledW.toFixed(1)} x ${scaledH.toFixed(1)}`);
         
         console.log('Making canvas container active...');
         canvasContainer.classList.add('active');
