@@ -639,6 +639,17 @@ fileInput.addEventListener('change', (e) => {
           console.log('Calling updateMarkers...');
           updateMarkers();
           
+          // TEST: Add a visible test marker
+          console.log('Adding test marker at 100,100');
+          const testMarker = document.createElement('div');
+          testMarker.className = 'marker';
+          testMarker.textContent = 'T';
+          testMarker.style.left = '100px';
+          testMarker.style.top = '100px';
+          testMarker.style.background = 'red';
+          markersContainer.appendChild(testMarker);
+          console.log('Test marker added');
+          
           console.log('✓ Setup complete');
         }, 10);
         
@@ -705,11 +716,13 @@ function drawCanvas() {
 }
 
 function updateMarkers() {
+  console.log('updateMarkers called, points:', points);
   markersContainer.innerHTML = '';
   
   // Apply the same transform as the canvas so markers stay in sync
   markersContainer.style.width = naturalW + 'px';
   markersContainer.style.height = naturalH + 'px';
+  console.log('Markers container size:', markersContainer.style.width, markersContainer.style.height);
   
   points.forEach((p, i) => {
     const marker = document.createElement('div');
@@ -717,8 +730,11 @@ function updateMarkers() {
     marker.textContent = i + 1;
     marker.style.left = `${p.x}px`;
     marker.style.top = `${p.y}px`;
+    console.log(`Marker ${i+1} created at:`, p.x, p.y);
     markersContainer.appendChild(marker);
   });
+  
+  console.log('Markers in container:', markersContainer.children.length);
   
   const count = points.length;
   if (count > 0) {
