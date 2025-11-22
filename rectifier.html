@@ -726,9 +726,16 @@ function updateMarkers() {
 }
 
 function screenToCanvas(screenX, screenY) {
-  const rect = canvasWrapper.getBoundingClientRect();
-  const x = (screenX - rect.left) / scale;
-  const y = (screenY - rect.top) / scale;
+  const rect = canvasContainer.getBoundingClientRect();
+  const containerX = screenX - rect.left;
+  const containerY = screenY - rect.top;
+  
+  // Account for pan and scale
+  const x = (containerX - panX) / scale;
+  const y = (containerY - panY) / scale;
+  
+  console.log('screenToCanvas:', { screenX, screenY, containerX, containerY, panX, panY, scale, resultX: x, resultY: y });
+  
   return { x, y };
 }
 
@@ -1003,9 +1010,14 @@ function updateAlignMarkers() {
 }
 
 function screenToAlignCanvas(screenX, screenY) {
-  const rect = alignCanvasWrapper.getBoundingClientRect();
-  const x = (screenX - rect.left) / alignScale;
-  const y = (screenY - rect.top) / alignScale;
+  const rect = alignCanvasContainer.getBoundingClientRect();
+  const containerX = screenX - rect.left;
+  const containerY = screenY - rect.top;
+  
+  // Account for pan and scale
+  const x = (containerX - alignPanX) / alignScale;
+  const y = (containerY - alignPanY) / alignScale;
+  
   return { x, y };
 }
 
