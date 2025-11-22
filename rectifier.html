@@ -639,17 +639,6 @@ fileInput.addEventListener('change', (e) => {
           console.log('Calling updateMarkers...');
           updateMarkers();
           
-          // TEST: Add a visible test marker
-          console.log('Adding test marker at 100,100');
-          const testMarker = document.createElement('div');
-          testMarker.className = 'marker';
-          testMarker.textContent = 'T';
-          testMarker.style.left = '100px';
-          testMarker.style.top = '100px';
-          testMarker.style.background = 'red';
-          markersContainer.appendChild(testMarker);
-          console.log('Test marker added');
-          
           console.log('✓ Setup complete');
         }, 10);
         
@@ -710,7 +699,7 @@ function drawCanvas() {
   const transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
   console.log('Applying transform:', transform);
   canvasWrapper.style.transform = transform;
-  markersContainer.style.transform = transform;
+  // DON'T transform markersContainer - it inherits from wrapper
   
   console.log('drawCanvas complete');
 }
@@ -1019,7 +1008,7 @@ function drawAlignCanvas() {
   const transform = `translate(${alignPanX}px, ${alignPanY}px) scale(${alignScale})`;
   console.log('Applying align transform:', transform);
   alignCanvasWrapper.style.transform = transform;
-  alignMarkersContainer.style.transform = transform;
+  // DON'T transform alignMarkersContainer - it inherits from wrapper
 }
 
 function updateAlignMarkers() {
