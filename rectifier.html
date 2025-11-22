@@ -618,6 +618,11 @@ fileInput.addEventListener('change', (e) => {
         canvas.height = naturalH;
         console.log('Canvas dimensions set:', canvas.width, 'x', canvas.height);
         
+        // CRITICAL: Set wrapper dimensions explicitly
+        canvasWrapper.style.width = naturalW + 'px';
+        canvasWrapper.style.height = naturalH + 'px';
+        console.log('Wrapper dimensions set');
+        
         // Draw image to canvas using OpenCV
         cv.imshow(canvas, srcImage);
         console.log('Image drawn to canvas');
@@ -682,6 +687,10 @@ function drawCanvas() {
     
     console.log('Reset to:', { panX, panY, scale });
   }
+  
+  // Ensure wrapper has explicit dimensions
+  canvasWrapper.style.width = naturalW + 'px';
+  canvasWrapper.style.height = naturalH + 'px';
   
   const transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
   console.log('Applying transform:', transform);
@@ -903,6 +912,11 @@ rectifyBtn.addEventListener('click', () => {
     alignNaturalH = rectifiedImage.rows;
     alignCanvas.width = alignNaturalW;
     alignCanvas.height = alignNaturalH;
+    
+    // CRITICAL: Set wrapper dimensions explicitly
+    alignCanvasWrapper.style.width = alignNaturalW + 'px';
+    alignCanvasWrapper.style.height = alignNaturalH + 'px';
+    
     cv.imshow(alignCanvas, rectifiedImage);
     
     alignPoints = [];
@@ -967,6 +981,10 @@ function drawAlignCanvas() {
     
     console.log('Reset align to:', { alignPanX, alignPanY, alignScale });
   }
+  
+  // Ensure wrapper has explicit dimensions
+  alignCanvasWrapper.style.width = alignNaturalW + 'px';
+  alignCanvasWrapper.style.height = alignNaturalH + 'px';
   
   const transform = `translate(${alignPanX}px, ${alignPanY}px) scale(${alignScale})`;
   console.log('Applying align transform:', transform);
