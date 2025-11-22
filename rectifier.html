@@ -239,7 +239,7 @@
   
   .loading {
     text-align: center;
-    padding: 2rem;
+    padding: 3rem;
     color: #666;
   }
   
@@ -254,6 +254,22 @@
     gap: 0.5rem;
     cursor: pointer;
   }
+  
+  .progress {
+    width: 100%;
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    margin-top: 1rem;
+    overflow: hidden;
+  }
+  
+  .progress-bar {
+    height: 100%;
+    background: #2196f3;
+    width: 0%;
+    transition: width 0.3s;
+  }
 </style>
 </head>
 <body>
@@ -266,9 +282,11 @@
   </p>
   
   <div id="loadingOpenCV" class="loading">
-    <p><strong>Loading OpenCV...</strong></p>
-    <p>Please wait while the image processing library loads (~8MB)</p>
-    <p id="loadingStatus" style="color: #666; font-size: 0.9em; margin-top: 1rem;">Downloading...</p>
+    <p><strong>Loading OpenCV.js...</strong></p>
+    <p id="loadingStatus" style="font-size: 0.9em; color: #999;">Initializing image processing library...</p>
+    <div class="progress">
+      <div id="loadingProgress" class="progress-bar"></div>
+    </div>
   </div>
   
   <div id="mainApp" style="display: none;">
@@ -367,42 +385,53 @@
 </div>
 
 <script>
-// Global state
-let cv = null;
+// Module pattern to encapsulate OpenCV loading
+var Module = {
+  onRuntimeInitialized() {
+    console.log('OpenCV.js runtime initialized');
+    onOpenCvReady();
+  }
+};
 
-// Load OpenCV.js manually with better error handling
+// Load OpenCV.js
 (function() {
   const script = document.createElement('script');
-  script.src = 'https://docs.opencv.org/4.5.2/opencv.js';
-  script.async = true;
+  script.src = 'https://docs.opencv.org/3.4.0/opencv.js';
+  script.async = false;
+  
+  let progressInterval;
+  let fakeProgress = 0;
+  
+  script.onloadstart = function() {
+    console.log('Starting OpenCV download...');
+    progressInterval = setInterval(() => {
+      fakeProgress += 2;
+      if (fakeProgress > 90) fakeProgress = 90;
+      document.getElementById('loadingProgress').style.width = fakeProgress + '%';
+    }, 100);
+  };
   
   script.onload = function() {
-    console.log('OpenCV.js script loaded, waiting for initialization...');
-    // OpenCV needs a moment to initialize after loading
-    const checkInterval = setInterval(() => {
-      if (typeof cv !== 'undefined' && cv.Mat) {
-        clearInterval(checkInterval);
-        onOpenCvReady();
-      }
-    }, 100);
-    
-    // Timeout after 10 seconds
-    setTimeout(() => {
-      clearInterval(checkInterval);
-      if (!cv || !cv.Mat) {
-        document.getElementById('loadingStatus').textContent = 'OpenCV failed to load. Please refresh the page.';
-        document.getElementById('loadingStatus').style.color = '#f44336';
-      }
-    }, 10000);
+    console.log('OpenCV.js script downloaded');
+    if (progressInterval) clearInterval(progressInterval);
+    document.getElementById('loadingProgress').style.width = '95%';
+    document.getElementById('loadingStatus').textContent = 'Initializing...';
   };
   
   script.onerror = function() {
-    document.getElementById('loadingStatus').textContent = 'Failed to download OpenCV. Please check your internet connection and refresh.';
+    console.error('Failed to load OpenCV.js');
+    if (progressInterval) clearInterval(progressInterval);
+    document.getElementById('loadingStatus').textContent = '❌ Failed to load. Please refresh the page.';
     document.getElementById('loadingStatus').style.color = '#f44336';
   };
   
   document.head.appendChild(script);
 })();
+</script>
+
+<script>
+// Global state
+let cv = null;
 let shiftHeld = false;
 let points = [];
 let alignPoints = [];
@@ -472,9 +501,16 @@ const alignResult = document.getElementById('alignResult');
 function onOpenCvReady() {
   cv = window.cv;
   if (cv && cv.Mat) {
-    loadingDiv.style.display = 'none';
-    mainApp.style.display = 'block';
-    console.log('OpenCV.js loaded and ready!');
+    document.getElementById('loadingProgress').style.width = '100%';
+    setTimeout(() => {
+      loadingDiv.style.display = 'none';
+      mainApp.style.display = 'block';
+    }, 300);
+    console.log('✓ OpenCV.js is ready!');
+  } else {
+    console.error('OpenCV loaded but cv.Mat not available');
+    document.getElementById('loadingStatus').textContent = '❌ Initialization failed. Please refresh.';
+    document.getElementById('loadingStatus').style.color = '#f44336';
   }
 }
 
@@ -505,7 +541,7 @@ fileInput.addEventListener('change', (e) => {
   if (!file) return;
   
   // Check if OpenCV is loaded
-  if (!cv) {
+  if (!cv || !cv.Mat) {
     alert('OpenCV is still loading. Please wait a moment and try again.');
     fileInput.value = '';
     return;
@@ -527,7 +563,7 @@ fileInput.addEventListener('change', (e) => {
         naturalW = img.width;
         naturalH = img.height;
         
-        console.log(`Image loaded: ${naturalW} x ${naturalH}`);
+        console.log(`✓ Image loaded: ${naturalW} x ${naturalH}`);
         
         points = [];
         scale = 1;
@@ -539,7 +575,7 @@ fileInput.addEventListener('change', (e) => {
         minScale = Math.min(containerW / naturalW, containerH / naturalH);
         scale = minScale;
         
-        console.log(`Initial scale: ${scale}, container: ${containerW} x ${containerH}`);
+        console.log(`Initial scale: ${scale.toFixed(3)}, container: ${containerW} x ${containerH}`);
         
         canvasContainer.classList.add('active');
         drawCanvas();
@@ -758,6 +794,8 @@ rectifyBtn.addEventListener('click', () => {
     srcPoints.delete();
     dstPoints.delete();
     M.delete();
+    
+    console.log(`✓ Image rectified: ${wFinal} x ${hFinal}`);
     
     // Show step 2
     step2.classList.remove('hidden');
@@ -1009,6 +1047,8 @@ applyAlignBtn.addEventListener('click', () => {
                   cv.INTER_CUBIC, cv.BORDER_CONSTANT, new cv.Scalar(255, 255, 255, 255));
     
     M.delete();
+    
+    console.log(`✓ Image aligned: rotation = ${rotationAngle.toFixed(2)}°`);
     
     showFinalImage(aligned, 'Aligned Image');
     aligned.delete();
