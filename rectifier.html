@@ -497,21 +497,34 @@ const applyAlignBtn = document.getElementById('applyAlignBtn');
 const alignPointsDisplay = document.getElementById('alignPointsDisplay');
 const alignResult = document.getElementById('alignResult');
 
-// OpenCV ready callback
+// OpenCV ready callback with polling
 function onOpenCvReady() {
-  cv = window.cv;
-  if (cv && cv.Mat) {
-    document.getElementById('loadingProgress').style.width = '100%';
-    setTimeout(() => {
-      loadingDiv.style.display = 'none';
-      mainApp.style.display = 'block';
-    }, 300);
-    console.log('✓ OpenCV.js is ready!');
-  } else {
-    console.error('OpenCV loaded but cv.Mat not available');
-    document.getElementById('loadingStatus').textContent = '❌ Initialization failed. Please refresh.';
-    document.getElementById('loadingStatus').style.color = '#f44336';
-  }
+  console.log('onOpenCvReady called, checking for cv.Mat...');
+  
+  let attempts = 0;
+  const maxAttempts = 50; // 5 seconds max
+  
+  const checkReady = setInterval(() => {
+    attempts++;
+    cv = window.cv;
+    
+    if (cv && cv.Mat) {
+      clearInterval(checkReady);
+      document.getElementById('loadingProgress').style.width = '100%';
+      setTimeout(() => {
+        loadingDiv.style.display = 'none';
+        mainApp.style.display = 'block';
+      }, 300);
+      console.log('✓ OpenCV.js is ready! cv.Mat is available.');
+    } else if (attempts >= maxAttempts) {
+      clearInterval(checkReady);
+      console.error('Timeout: cv.Mat never became available');
+      document.getElementById('loadingStatus').textContent = '❌ Initialization timeout. Please refresh.';
+      document.getElementById('loadingStatus').style.color = '#f44336';
+    } else {
+      console.log(`Waiting for cv.Mat... attempt ${attempts}`);
+    }
+  }, 100);
 }
 
 // Keyboard handling
