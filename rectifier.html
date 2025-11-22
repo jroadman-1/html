@@ -613,27 +613,20 @@ fileInput.addEventListener('change', (e) => {
         console.log(`Initial pan: (${panX.toFixed(1)}, ${panY.toFixed(1)})`);
         console.log(`Scaled image size: ${scaledW.toFixed(1)} x ${scaledH.toFixed(1)}`);
         
+        // Set canvas dimensions BEFORE showing it
+        canvas.width = naturalW;
+        canvas.height = naturalH;
+        console.log('Canvas dimensions set:', canvas.width, 'x', canvas.height);
+        
+        // Draw image to canvas using OpenCV
+        cv.imshow(canvas, srcImage);
+        console.log('Image drawn to canvas');
+        
         console.log('Making canvas container active...');
         canvasContainer.classList.add('active');
         
         console.log('Calling drawCanvas...');
         drawCanvas();
-        
-        // Force multiple redraws to ensure canvas appears
-        setTimeout(() => {
-          console.log('Forced redraw 1');
-          drawCanvas();
-        }, 10);
-        
-        setTimeout(() => {
-          console.log('Forced redraw 2');
-          drawCanvas();
-        }, 100);
-        
-        setTimeout(() => {
-          console.log('Forced redraw 3');
-          drawCanvas();
-        }, 500);
         
         console.log('Calling updateMarkers...');
         updateMarkers();
@@ -690,19 +683,6 @@ function drawCanvas() {
     console.log('Reset to:', { panX, panY, scale });
   }
   
-  console.log('Setting canvas size to:', naturalW, 'x', naturalH);
-  canvas.width = naturalW;
-  canvas.height = naturalH;
-  
-  console.log('Calling cv.imshow...');
-  try {
-    cv.imshow(canvas, srcImage);
-    console.log('cv.imshow successful');
-  } catch (err) {
-    console.error('cv.imshow failed:', err);
-    return;
-  }
-  
   const transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
   console.log('Applying transform:', transform);
   canvasWrapper.style.transform = transform;
@@ -742,16 +722,9 @@ function updateMarkers() {
 }
 
 function screenToCanvas(screenX, screenY) {
-  const rect = canvasContainer.getBoundingClientRect();
-  const containerX = screenX - rect.left;
-  const containerY = screenY - rect.top;
-  
-  // Account for pan and scale
-  const x = (containerX - panX) / scale;
-  const y = (containerY - panY) / scale;
-  
-  console.log('screenToCanvas:', { screenX, screenY, containerX, containerY, panX, panY, scale, resultX: x, resultY: y });
-  
+  const rect = canvasWrapper.getBoundingClientRect();
+  const x = (screenX - rect.left) / scale;
+  const y = (screenY - rect.top) / scale;
   return { x, y };
 }
 
@@ -799,37 +772,20 @@ canvasContainer.addEventListener('mousemove', (e) => {
 });
 
 canvasContainer.addEventListener('mouseup', (e) => {
-  console.log('mouseup event:', { 
-    dragMoved, 
-    shiftHeld, 
-    naturalW, 
-    pointsLength: points.length,
-    clientX: e.clientX,
-    clientY: e.clientY
-  });
-  
   canvasContainer.classList.remove('grabbing');
   
+  console.log('mouseup:', { dragMoved, shiftHeld, naturalW, pointsLength: points.length });
+  
   if (!dragMoved && shiftHeld && naturalW && points.length < 4) {
-    console.log('Attempting to add point...');
     const coords = screenToCanvas(e.clientX, e.clientY);
-    console.log('Calculated coords:', coords);
-    
+    console.log('Click coords:', coords, 'bounds:', { w: naturalW, h: naturalH });
     if (coords.x >= 0 && coords.x <= naturalW && coords.y >= 0 && coords.y <= naturalH) {
-      console.log('Coords valid, adding point');
+      console.log('Adding point:', coords);
       points.push(coords);
-      console.log('Points array now:', points);
       updateMarkers();
     } else {
-      console.log('Coords out of bounds:', { 
-        x: coords.x, 
-        y: coords.y, 
-        maxX: naturalW, 
-        maxY: naturalH 
-      });
+      console.log('Click outside bounds');
     }
-  } else {
-    console.log('Click conditions not met');
   }
   
   isDragging = false;
@@ -1049,14 +1005,9 @@ function updateAlignMarkers() {
 }
 
 function screenToAlignCanvas(screenX, screenY) {
-  const rect = alignCanvasContainer.getBoundingClientRect();
-  const containerX = screenX - rect.left;
-  const containerY = screenY - rect.top;
-  
-  // Account for pan and scale
-  const x = (containerX - alignPanX) / alignScale;
-  const y = (containerY - alignPanY) / alignScale;
-  
+  const rect = alignCanvasWrapper.getBoundingClientRect();
+  const x = (screenX - rect.left) / alignScale;
+  const y = (screenY - rect.top) / alignScale;
   return { x, y };
 }
 
