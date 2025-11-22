@@ -656,6 +656,24 @@ function drawCanvas() {
     return;
   }
   
+  // Guard against invalid values
+  if (!isFinite(panX) || !isFinite(panY) || !isFinite(scale)) {
+    console.error('Invalid transform values detected!', { panX, panY, scale });
+    console.error('Resetting to safe defaults...');
+    
+    const containerW = canvasContainer.clientWidth;
+    const containerH = canvasContainer.clientHeight;
+    minScale = Math.min(containerW / naturalW, containerH / naturalH);
+    scale = minScale;
+    
+    const scaledW = naturalW * scale;
+    const scaledH = naturalH * scale;
+    panX = Math.max(0, (containerW - scaledW) / 2);
+    panY = Math.max(0, (containerH - scaledH) / 2);
+    
+    console.log('Reset to:', { panX, panY, scale });
+  }
+  
   console.log('Setting canvas size to:', naturalW, 'x', naturalH);
   canvas.width = naturalW;
   canvas.height = naturalH;
