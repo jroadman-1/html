@@ -550,28 +550,44 @@ document.addEventListener('keyup', (e) => {
 
 // File upload
 fileInput.addEventListener('change', (e) => {
+  console.log('File input changed');
   const file = e.target.files[0];
-  if (!file) return;
+  if (!file) {
+    console.log('No file selected');
+    return;
+  }
+  
+  console.log('File selected:', file.name, file.type, file.size, 'bytes');
   
   // Check if OpenCV is loaded
   if (!cv || !cv.Mat) {
+    console.error('OpenCV not ready:', { cv: !!cv, Mat: cv ? !!cv.Mat : false });
     alert('OpenCV is still loading. Please wait a moment and try again.');
     fileInput.value = '';
     return;
   }
   
+  console.log('OpenCV is ready, creating FileReader');
   const reader = new FileReader();
+  
   reader.onload = (event) => {
+    console.log('FileReader loaded, creating Image element');
     const img = new Image();
+    
     img.onload = () => {
+      console.log('Image element loaded:', img.width, 'x', img.height);
+      
       try {
         // Clean up previous image if exists
         if (srcImage) {
+          console.log('Cleaning up previous image');
           srcImage.delete();
         }
         
+        console.log('Calling cv.imread...');
         // Store original image
         srcImage = cv.imread(img);
+        console.log('cv.imread successful, srcImage:', srcImage.rows, 'x', srcImage.cols);
         
         naturalW = img.width;
         naturalH = img.height;
@@ -585,36 +601,75 @@ fileInput.addEventListener('change', (e) => {
         
         const containerW = canvasContainer.clientWidth;
         const containerH = canvasContainer.clientHeight;
+        console.log('Container size:', containerW, 'x', containerH);
+        
         minScale = Math.min(containerW / naturalW, containerH / naturalH);
         scale = minScale;
         
-        console.log(`Initial scale: ${scale.toFixed(3)}, container: ${containerW} x ${containerH}`);
+        console.log(`Initial scale: ${scale.toFixed(3)}, min scale: ${minScale.toFixed(3)}`);
         
+        console.log('Making canvas container active...');
         canvasContainer.classList.add('active');
+        
+        console.log('Calling drawCanvas...');
         drawCanvas();
+        
+        console.log('Calling updateMarkers...');
         updateMarkers();
+        
+        console.log('✓ Setup complete');
+        
       } catch (err) {
+        console.error('Error in image loading try block:', err);
         alert('Error loading image: ' + err.message);
-        console.error(err);
       }
     };
-    img.onerror = () => {
+    
+    img.onerror = (err) => {
+      console.error('Image element error:', err);
       alert('Failed to load image. Please try a different file.');
     };
+    
+    console.log('Setting img.src...');
     img.src = event.target.result;
   };
+  
+  reader.onerror = (err) => {
+    console.error('FileReader error:', err);
+    alert('Failed to read file.');
+  };
+  
+  console.log('Starting FileReader.readAsDataURL...');
   reader.readAsDataURL(file);
 });
 
 function drawCanvas() {
-  if (!srcImage) return;
+  console.log('drawCanvas called');
   
+  if (!srcImage) {
+    console.error('drawCanvas: srcImage is null!');
+    return;
+  }
+  
+  console.log('Setting canvas size to:', naturalW, 'x', naturalH);
   canvas.width = naturalW;
   canvas.height = naturalH;
-  cv.imshow(canvas, srcImage);
   
-  canvasWrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-  markersContainer.style.transform = canvasWrapper.style.transform;
+  console.log('Calling cv.imshow...');
+  try {
+    cv.imshow(canvas, srcImage);
+    console.log('cv.imshow successful');
+  } catch (err) {
+    console.error('cv.imshow failed:', err);
+    return;
+  }
+  
+  const transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+  console.log('Applying transform:', transform);
+  canvasWrapper.style.transform = transform;
+  markersContainer.style.transform = transform;
+  
+  console.log('drawCanvas complete');
 }
 
 function updateMarkers() {
