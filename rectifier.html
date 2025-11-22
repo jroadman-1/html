@@ -1,0 +1,986 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Four-Dot Image Rectifier (Standalone)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    margin: 0;
+    padding: 1.5rem;
+    background: #f5f5f5;
+  }
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  h1 {
+    margin: 0 0 1.5rem 0;
+    color: #1a1a1a;
+    font-size: 1.75rem;
+  }
+  h2 {
+    margin: 2rem 0 1rem 0;
+    color: #1a1a1a;
+    font-size: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .step {
+    margin-bottom: 2rem;
+  }
+  .step.hidden {
+    display: none;
+  }
+  .upload-section {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f9f9f9;
+    border: 2px dashed #ddd;
+    border-radius: 4px;
+  }
+  .upload-section input[type="file"] {
+    display: block;
+    width: 100%;
+    padding: 0.5rem;
+  }
+  .instructions {
+    background: #e3f2fd;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: 4px;
+    border-left: 4px solid #2196f3;
+  }
+  .instructions p {
+    margin: 0.25rem 0;
+    color: #1565c0;
+    font-size: 0.9rem;
+  }
+  .canvas-container {
+    position: relative;
+    border: 2px solid #ddd;
+    overflow: hidden;
+    height: 70vh;
+    background: #fafafa;
+    margin-bottom: 1.5rem;
+    display: none;
+    cursor: grab;
+  }
+  .canvas-container.active {
+    display: block;
+  }
+  .canvas-container.grabbing {
+    cursor: grabbing;
+  }
+  .canvas-container.crosshair {
+    cursor: crosshair;
+  }
+  
+  kbd {
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: monospace;
+    font-size: 0.85em;
+  }
+  
+  #canvasWrapper, #alignCanvasWrapper {
+    position: relative;
+    display: inline-block;
+    transform-origin: 0 0;
+  }
+  
+  #canvas, #alignCanvas {
+    display: block;
+  }
+  
+  #markersContainer, #alignMarkersContainer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+  }
+  
+  .marker {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    background: #2196f3;
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+  }
+  
+  .align-marker {
+    background: #ff5722;
+  }
+  
+  .controls {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #f9f9f9;
+    border-radius: 4px;
+  }
+  
+  .control-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  label {
+    font-weight: 500;
+    color: #333;
+  }
+  
+  input[type="number"], input[type="text"] {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  
+  .buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  button {
+    padding: 0.625rem 1.25rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-primary {
+    background: #2196f3;
+    color: white;
+  }
+  
+  .btn-primary:hover:not(:disabled) {
+    background: #1976d2;
+  }
+  
+  .btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+  }
+  
+  .btn-secondary:hover:not(:disabled) {
+    background: #bdbdbd;
+  }
+  
+  .btn-danger {
+    background: #f44336;
+    color: white;
+  }
+  
+  .btn-danger:hover:not(:disabled) {
+    background: #d32f2f;
+  }
+  
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .status {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 4px;
+    background: #f9f9f9;
+    border-left: 4px solid #4caf50;
+  }
+  
+  .error {
+    background: #ffebee;
+    border-left-color: #f44336;
+    color: #c62828;
+  }
+  
+  .result-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: #f9f9f9;
+    border-radius: 4px;
+  }
+  
+  .result-section img {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  
+  .result-buttons {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+  
+  .loading {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+  }
+  
+  .radio-group {
+    display: flex;
+    gap: 1.5rem;
+  }
+  
+  .radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Four-Dot Image Rectifier</h1>
+  <p style="color: #666; margin-bottom: 2rem;">
+    Perspective-correct images using four corner points, then optionally align by an edge.
+    <br>All processing happens in your browser - no server required!
+  </p>
+  
+  <div id="loadingOpenCV" class="loading">
+    <p><strong>Loading OpenCV...</strong></p>
+    <p>Please wait while the image processing library loads (~8MB)</p>
+  </div>
+  
+  <div id="mainApp" style="display: none;">
+    <!-- STEP 1: Upload and Rectify -->
+    <div id="step1" class="step">
+      <h2>Step 1: Upload and Rectify Image</h2>
+      
+      <div class="upload-section">
+        <label for="fileInput">Select Image:</label>
+        <input type="file" id="fileInput" accept="image/*">
+      </div>
+      
+      <div class="instructions">
+        <p><strong>Instructions:</strong></p>
+        <p>1. Upload an image</p>
+        <p>2. Hold <kbd>Shift</kbd> and click the 4 corners (any order)</p>
+        <p>3. Pan by dragging, zoom with scroll wheel or double-click</p>
+        <p>4. Set dimensions and click "Rectify Image"</p>
+      </div>
+      
+      <div class="controls">
+        <div class="control-row">
+          <label>Width (mm): <input type="number" id="widthMm" value="100" step="1" min="1"></label>
+          <label>Height (mm): <input type="number" id="heightMm" value="100" step="1" min="1"></label>
+          <label>DPI: <input type="number" id="dpi" value="300" step="1" min="72"></label>
+          <label>Margin (mm): <input type="number" id="marginMm" value="10" step="1" min="0"></label>
+        </div>
+        
+        <div class="buttons">
+          <button id="zoomInBtn" class="btn-secondary">Zoom In (+)</button>
+          <button id="zoomOutBtn" class="btn-secondary">Zoom Out (-)</button>
+          <button id="undoBtn" class="btn-secondary">Undo Last Point</button>
+          <button id="resetBtn" class="btn-danger">Reset Points</button>
+          <button id="rectifyBtn" class="btn-primary" disabled>Rectify Image</button>
+        </div>
+        
+        <div id="pointsDisplay" class="status" style="display: none;"></div>
+      </div>
+      
+      <div id="canvasContainer" class="canvas-container">
+        <div id="canvasWrapper">
+          <canvas id="canvas"></canvas>
+          <div id="markersContainer"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- STEP 2: Alignment (Optional) -->
+    <div id="step2" class="step hidden">
+      <h2>Step 2: Align Image (Optional)</h2>
+      
+      <div class="instructions">
+        <p><strong>Instructions:</strong></p>
+        <p>1. Hold <kbd>Shift</kbd> and click 2 points along an edge that should be straight</p>
+        <p>2. Choose whether that edge should be horizontal or vertical</p>
+        <p>3. Click "Apply Alignment" or "Skip" to use the rectified image as-is</p>
+      </div>
+      
+      <div class="controls">
+        <div class="control-row">
+          <label style="font-weight: bold;">Edge Direction:</label>
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="alignDirection" value="horizontal" checked>
+              Horizontal
+            </label>
+            <label>
+              <input type="radio" name="alignDirection" value="vertical">
+              Vertical
+            </label>
+          </div>
+        </div>
+        
+        <div class="buttons">
+          <button id="alignZoomInBtn" class="btn-secondary">Zoom In (+)</button>
+          <button id="alignZoomOutBtn" class="btn-secondary">Zoom Out (-)</button>
+          <button id="alignUndoBtn" class="btn-secondary">Undo Last Point</button>
+          <button id="alignResetBtn" class="btn-danger">Reset Points</button>
+          <button id="skipAlignBtn" class="btn-secondary">Skip Alignment</button>
+          <button id="applyAlignBtn" class="btn-primary" disabled>Apply Alignment</button>
+        </div>
+        
+        <div id="alignPointsDisplay" class="status" style="display: none;"></div>
+      </div>
+      
+      <div id="alignCanvasContainer" class="canvas-container">
+        <div id="alignCanvasWrapper">
+          <canvas id="alignCanvas"></canvas>
+          <div id="alignMarkersContainer"></div>
+        </div>
+      </div>
+      
+      <div id="alignResult"></div>
+    </div>
+  </div>
+</div>
+
+<script async src="https://docs.opencv.org/4.5.2/opencv.js" onload="onOpenCvReady()"></script>
+
+<script>
+// Global state
+let cv = null;
+let shiftHeld = false;
+let points = [];
+let alignPoints = [];
+let srcImage = null;
+let rectifiedImage = null;
+
+// Canvas 1 state (rectify)
+let scale = 1, panX = 0, panY = 0;
+let isDragging = false, dragStartX = 0, dragStartY = 0;
+let naturalW = 0, naturalH = 0;
+let minScale = 1;
+const ZOOM_STEP = 0.1;
+const WHEEL_ZOOM_IN_STEP = 0.15;
+const WHEEL_ZOOM_OUT_STEP = 0.1;
+const MAX_SCALE = 5;
+const DRAG_THRESHOLD = 5;
+let dragMoved = false;
+
+// Canvas 2 state (align)
+let alignScale = 1, alignPanX = 0, alignPanY = 0;
+let alignIsDragging = false, alignDragStartX = 0, alignDragStartY = 0;
+let alignNaturalW = 0, alignNaturalH = 0;
+let alignMinScale = 1;
+let alignDragMoved = false;
+
+// Elements
+const loadingDiv = document.getElementById('loadingOpenCV');
+const mainApp = document.getElementById('mainApp');
+const fileInput = document.getElementById('fileInput');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const canvasContainer = document.getElementById('canvasContainer');
+const canvasWrapper = document.getElementById('canvasWrapper');
+const markersContainer = document.getElementById('markersContainer');
+
+const widthMmInput = document.getElementById('widthMm');
+const heightMmInput = document.getElementById('heightMm');
+const dpiInput = document.getElementById('dpi');
+const marginMmInput = document.getElementById('marginMm');
+
+const zoomInBtn = document.getElementById('zoomInBtn');
+const zoomOutBtn = document.getElementById('zoomOutBtn');
+const undoBtn = document.getElementById('undoBtn');
+const resetBtn = document.getElementById('resetBtn');
+const rectifyBtn = document.getElementById('rectifyBtn');
+const pointsDisplay = document.getElementById('pointsDisplay');
+
+const step1 = document.getElementById('step1');
+const step2 = document.getElementById('step2');
+
+const alignCanvas = document.getElementById('alignCanvas');
+const alignCtx = alignCanvas.getContext('2d');
+const alignCanvasContainer = document.getElementById('alignCanvasContainer');
+const alignCanvasWrapper = document.getElementById('alignCanvasWrapper');
+const alignMarkersContainer = document.getElementById('alignMarkersContainer');
+
+const alignZoomInBtn = document.getElementById('alignZoomInBtn');
+const alignZoomOutBtn = document.getElementById('alignZoomOutBtn');
+const alignUndoBtn = document.getElementById('alignUndoBtn');
+const alignResetBtn = document.getElementById('alignResetBtn');
+const skipAlignBtn = document.getElementById('skipAlignBtn');
+const applyAlignBtn = document.getElementById('applyAlignBtn');
+const alignPointsDisplay = document.getElementById('alignPointsDisplay');
+const alignResult = document.getElementById('alignResult');
+
+// OpenCV ready callback
+function onOpenCvReady() {
+  cv = window.cv;
+  loadingDiv.style.display = 'none';
+  mainApp.style.display = 'block';
+  console.log('OpenCV.js loaded successfully');
+}
+
+// Keyboard handling
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Shift') {
+    shiftHeld = true;
+    if (canvasContainer.classList.contains('active')) {
+      canvasContainer.classList.add('crosshair');
+    }
+    if (alignCanvasContainer.classList.contains('active')) {
+      alignCanvasContainer.classList.add('crosshair');
+    }
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.key === 'Shift') {
+    shiftHeld = false;
+    canvasContainer.classList.remove('crosshair');
+    alignCanvasContainer.classList.remove('crosshair');
+  }
+});
+
+// File upload
+fileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const img = new Image();
+    img.onload = () => {
+      // Store original image
+      srcImage = cv.imread(img);
+      
+      naturalW = img.width;
+      naturalH = img.height;
+      
+      points = [];
+      scale = 1;
+      panX = 0;
+      panY = 0;
+      
+      const containerW = canvasContainer.clientWidth;
+      const containerH = canvasContainer.clientHeight;
+      minScale = Math.min(containerW / naturalW, containerH / naturalH);
+      scale = minScale;
+      
+      canvasContainer.classList.add('active');
+      drawCanvas();
+      updateMarkers();
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+function drawCanvas() {
+  if (!srcImage) return;
+  
+  canvas.width = naturalW;
+  canvas.height = naturalH;
+  cv.imshow(canvas, srcImage);
+  
+  canvasWrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+  markersContainer.style.transform = canvasWrapper.style.transform;
+}
+
+function updateMarkers() {
+  markersContainer.innerHTML = '';
+  points.forEach((p, i) => {
+    const marker = document.createElement('div');
+    marker.className = 'marker';
+    marker.textContent = i + 1;
+    marker.style.left = `${p.x}px`;
+    marker.style.top = `${p.y}px`;
+    markersContainer.appendChild(marker);
+  });
+  
+  const count = points.length;
+  if (count > 0) {
+    pointsDisplay.style.display = 'block';
+    const coords = points.map((p, i) =>
+      `Point ${i+1}: (${Math.round(p.x)}, ${Math.round(p.y)})`
+    ).join('  •  ');
+    pointsDisplay.textContent = `Points selected: ${count} / 4  •  ${coords}`;
+  } else {
+    pointsDisplay.style.display = 'none';
+  }
+  
+  rectifyBtn.disabled = (count !== 4);
+}
+
+function screenToCanvas(screenX, screenY) {
+  const rect = canvasWrapper.getBoundingClientRect();
+  const x = (screenX - rect.left) / scale;
+  const y = (screenY - rect.top) / scale;
+  return { x, y };
+}
+
+function zoomAtPoint(zoomIn, mouseX, mouseY, step = ZOOM_STEP) {
+  const oldScale = scale;
+  const newScale = zoomIn 
+    ? Math.min(scale + step, MAX_SCALE)
+    : Math.max(scale - step, minScale);
+  
+  if (oldScale === newScale) return;
+  
+  const canvasX = (mouseX - panX) / oldScale;
+  const canvasY = (mouseY - panY) / oldScale;
+  
+  scale = newScale;
+  
+  panX = mouseX - canvasX * newScale;
+  panY = mouseY - canvasY * newScale;
+  
+  drawCanvas();
+}
+
+// Canvas 1 event listeners
+canvasContainer.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  dragMoved = false;
+  dragStartX = e.clientX - panX;
+  dragStartY = e.clientY - panY;
+  canvasContainer.classList.add('grabbing');
+});
+
+canvasContainer.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  
+  const deltaX = Math.abs(e.clientX - panX - dragStartX);
+  const deltaY = Math.abs(e.clientY - panY - dragStartY);
+  
+  if (deltaX > DRAG_THRESHOLD || deltaY > DRAG_THRESHOLD) {
+    dragMoved = true;
+  }
+  
+  panX = e.clientX - dragStartX;
+  panY = e.clientY - dragStartY;
+  drawCanvas();
+});
+
+canvasContainer.addEventListener('mouseup', (e) => {
+  canvasContainer.classList.remove('grabbing');
+  
+  if (!dragMoved && shiftHeld && naturalW && points.length < 4) {
+    const coords = screenToCanvas(e.clientX, e.clientY);
+    if (coords.x >= 0 && coords.x <= naturalW && coords.y >= 0 && coords.y <= naturalH) {
+      points.push(coords);
+      updateMarkers();
+    }
+  }
+  
+  isDragging = false;
+});
+
+canvasContainer.addEventListener('mouseleave', () => {
+  isDragging = false;
+  canvasContainer.classList.remove('grabbing');
+});
+
+canvasContainer.addEventListener('dblclick', (e) => {
+  if (!naturalW) return;
+  
+  const rect = canvasContainer.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  zoomAtPoint(true, mouseX, mouseY);
+});
+
+canvasContainer.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (!naturalW) return;
+  
+  const rect = canvasContainer.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  const zoomIn = e.deltaY < 0;
+  const step = zoomIn ? WHEEL_ZOOM_IN_STEP : WHEEL_ZOOM_OUT_STEP;
+  zoomAtPoint(zoomIn, mouseX, mouseY, step);
+});
+
+zoomInBtn.addEventListener('click', () => {
+  if (!naturalW) return;
+  const centerX = canvasContainer.clientWidth / 2;
+  const centerY = canvasContainer.clientHeight / 2;
+  zoomAtPoint(true, centerX, centerY);
+});
+
+zoomOutBtn.addEventListener('click', () => {
+  if (!naturalW) return;
+  const centerX = canvasContainer.clientWidth / 2;
+  const centerY = canvasContainer.clientHeight / 2;
+  zoomAtPoint(false, centerX, centerY);
+});
+
+undoBtn.addEventListener('click', () => {
+  points.pop();
+  updateMarkers();
+});
+
+resetBtn.addEventListener('click', () => {
+  points = [];
+  updateMarkers();
+});
+
+// Rectify button
+rectifyBtn.addEventListener('click', () => {
+  if (points.length !== 4 || !srcImage) return;
+  
+  try {
+    const widthMm = parseFloat(widthMmInput.value);
+    const heightMm = parseFloat(heightMmInput.value);
+    const dpi = parseFloat(dpiInput.value);
+    const marginMm = parseFloat(marginMmInput.value);
+    
+    // Order corners: TL, TR, BR, BL
+    const ordered = orderCorners(points);
+    
+    // Calculate destination size
+    const pxPerMm = dpi / 25.4;
+    const wRect = Math.round(widthMm * pxPerMm);
+    const hRect = Math.round(heightMm * pxPerMm);
+    const margin = Math.round(marginMm * pxPerMm);
+    const wFinal = wRect + 2 * margin;
+    const hFinal = hRect + 2 * margin;
+    
+    // Source points (from user clicks)
+    const srcPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
+      ordered[0].x, ordered[0].y,
+      ordered[1].x, ordered[1].y,
+      ordered[2].x, ordered[2].y,
+      ordered[3].x, ordered[3].y
+    ]);
+    
+    // Destination points (rectangle with margins)
+    const dstPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
+      margin, margin,
+      margin + wRect, margin,
+      margin + wRect, margin + hRect,
+      margin, margin + hRect
+    ]);
+    
+    // Get perspective transform
+    const M = cv.getPerspectiveTransform(srcPoints, dstPoints);
+    
+    // Apply warp
+    rectifiedImage = new cv.Mat();
+    cv.warpPerspective(srcImage, rectifiedImage, M, new cv.Size(wFinal, hFinal),
+                       cv.INTER_CUBIC, cv.BORDER_CONSTANT, new cv.Scalar(255, 255, 255, 255));
+    
+    // Clean up
+    srcPoints.delete();
+    dstPoints.delete();
+    M.delete();
+    
+    // Show step 2
+    step2.classList.remove('hidden');
+    
+    // Setup align canvas
+    alignNaturalW = rectifiedImage.cols;
+    alignNaturalH = rectifiedImage.rows;
+    alignCanvas.width = alignNaturalW;
+    alignCanvas.height = alignNaturalH;
+    cv.imshow(alignCanvas, rectifiedImage);
+    
+    alignPoints = [];
+    alignScale = 1;
+    alignPanX = 0;
+    alignPanY = 0;
+    
+    const containerW = alignCanvasContainer.clientWidth;
+    const containerH = alignCanvasContainer.clientHeight;
+    alignMinScale = Math.min(containerW / alignNaturalW, containerH / alignNaturalH);
+    alignScale = alignMinScale;
+    
+    alignCanvasContainer.classList.add('active');
+    drawAlignCanvas();
+    updateAlignMarkers();
+    
+    step2.scrollIntoView({ behavior: 'smooth' });
+    
+  } catch (err) {
+    alert('Error during rectification: ' + err.message);
+    console.error(err);
+  }
+});
+
+function orderCorners(pts) {
+  // Order as TL, TR, BR, BL
+  const sorted = [...pts].sort((a, b) => a.y - b.y);
+  const topTwo = sorted.slice(0, 2).sort((a, b) => a.x - b.x);
+  const bottomTwo = sorted.slice(2, 4).sort((a, b) => a.x - b.x);
+  
+  return [
+    topTwo[0],     // TL
+    topTwo[1],     // TR
+    bottomTwo[1],  // BR
+    bottomTwo[0]   // BL
+  ];
+}
+
+// Align canvas functions
+function drawAlignCanvas() {
+  if (!rectifiedImage) return;
+  
+  alignCanvasWrapper.style.transform = `translate(${alignPanX}px, ${alignPanY}px) scale(${alignScale})`;
+  alignMarkersContainer.style.transform = alignCanvasWrapper.style.transform;
+}
+
+function updateAlignMarkers() {
+  alignMarkersContainer.innerHTML = '';
+  alignPoints.forEach((p, i) => {
+    const marker = document.createElement('div');
+    marker.className = 'marker align-marker';
+    marker.textContent = i + 1;
+    marker.style.left = `${p.x}px`;
+    marker.style.top = `${p.y}px`;
+    alignMarkersContainer.appendChild(marker);
+  });
+  
+  const count = alignPoints.length;
+  if (count > 0) {
+    alignPointsDisplay.style.display = 'block';
+    const coords = alignPoints.map((p, i) =>
+      `Point ${i+1}: (${Math.round(p.x)}, ${Math.round(p.y)})`
+    ).join('  •  ');
+    alignPointsDisplay.textContent = `Points selected: ${count} / 2  •  ${coords}`;
+  } else {
+    alignPointsDisplay.style.display = 'none';
+  }
+  
+  applyAlignBtn.disabled = (count !== 2);
+}
+
+function screenToAlignCanvas(screenX, screenY) {
+  const rect = alignCanvasWrapper.getBoundingClientRect();
+  const x = (screenX - rect.left) / alignScale;
+  const y = (screenY - rect.top) / alignScale;
+  return { x, y };
+}
+
+function alignZoomAtPoint(zoomIn, mouseX, mouseY, step = ZOOM_STEP) {
+  const oldScale = alignScale;
+  const newScale = zoomIn 
+    ? Math.min(alignScale + step, MAX_SCALE)
+    : Math.max(alignScale - step, alignMinScale);
+  
+  if (oldScale === newScale) return;
+  
+  const canvasX = (mouseX - alignPanX) / oldScale;
+  const canvasY = (mouseY - alignPanY) / oldScale;
+  
+  alignScale = newScale;
+  
+  alignPanX = mouseX - canvasX * newScale;
+  alignPanY = mouseY - canvasY * newScale;
+  
+  drawAlignCanvas();
+}
+
+// Align canvas event listeners
+alignCanvasContainer.addEventListener('mousedown', (e) => {
+  alignIsDragging = true;
+  alignDragMoved = false;
+  alignDragStartX = e.clientX - alignPanX;
+  alignDragStartY = e.clientY - alignPanY;
+  alignCanvasContainer.classList.add('grabbing');
+});
+
+alignCanvasContainer.addEventListener('mousemove', (e) => {
+  if (!alignIsDragging) return;
+  
+  const deltaX = Math.abs(e.clientX - alignPanX - alignDragStartX);
+  const deltaY = Math.abs(e.clientY - alignPanY - alignDragStartY);
+  
+  if (deltaX > DRAG_THRESHOLD || deltaY > DRAG_THRESHOLD) {
+    alignDragMoved = true;
+  }
+  
+  alignPanX = e.clientX - alignDragStartX;
+  alignPanY = e.clientY - alignDragStartY;
+  drawAlignCanvas();
+});
+
+alignCanvasContainer.addEventListener('mouseup', (e) => {
+  alignCanvasContainer.classList.remove('grabbing');
+  
+  if (!alignDragMoved && shiftHeld && alignNaturalW && alignPoints.length < 2) {
+    const coords = screenToAlignCanvas(e.clientX, e.clientY);
+    if (coords.x >= 0 && coords.x <= alignNaturalW && coords.y >= 0 && coords.y <= alignNaturalH) {
+      alignPoints.push(coords);
+      updateAlignMarkers();
+    }
+  }
+  
+  alignIsDragging = false;
+});
+
+alignCanvasContainer.addEventListener('mouseleave', () => {
+  alignIsDragging = false;
+  alignCanvasContainer.classList.remove('grabbing');
+});
+
+alignCanvasContainer.addEventListener('dblclick', (e) => {
+  if (!alignNaturalW) return;
+  
+  const rect = alignCanvasContainer.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  alignZoomAtPoint(true, mouseX, mouseY);
+});
+
+alignCanvasContainer.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (!alignNaturalW) return;
+  
+  const rect = alignCanvasContainer.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  const zoomIn = e.deltaY < 0;
+  const step = zoomIn ? WHEEL_ZOOM_IN_STEP : WHEEL_ZOOM_OUT_STEP;
+  alignZoomAtPoint(zoomIn, mouseX, mouseY, step);
+});
+
+alignZoomInBtn.addEventListener('click', () => {
+  if (!alignNaturalW) return;
+  const centerX = alignCanvasContainer.clientWidth / 2;
+  const centerY = alignCanvasContainer.clientHeight / 2;
+  alignZoomAtPoint(true, centerX, centerY);
+});
+
+alignZoomOutBtn.addEventListener('click', () => {
+  if (!alignNaturalW) return;
+  const centerX = alignCanvasContainer.clientWidth / 2;
+  const centerY = alignCanvasContainer.clientHeight / 2;
+  alignZoomAtPoint(false, centerX, centerY);
+});
+
+alignUndoBtn.addEventListener('click', () => {
+  alignPoints.pop();
+  updateAlignMarkers();
+});
+
+alignResetBtn.addEventListener('click', () => {
+  alignPoints = [];
+  updateAlignMarkers();
+});
+
+skipAlignBtn.addEventListener('click', () => {
+  showFinalImage(rectifiedImage, 'Final Image (No Alignment Applied)');
+});
+
+applyAlignBtn.addEventListener('click', () => {
+  if (alignPoints.length !== 2 || !rectifiedImage) return;
+  
+  try {
+    const direction = document.querySelector('input[name="alignDirection"]:checked').value;
+    
+    const pt1 = alignPoints[0];
+    const pt2 = alignPoints[1];
+    
+    // Calculate angle
+    const dx = pt2.x - pt1.x;
+    const dy = pt2.y - pt1.y;
+    let angleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+    angleDeg = -angleDeg; // Negate for image coordinates
+    
+    let rotationAngle;
+    if (direction === 'horizontal') {
+      const rot0 = -angleDeg;
+      const rot180 = 180 - angleDeg;
+      const norm0 = ((rot0 + 180) % 360) - 180;
+      const norm180 = ((rot180 + 180) % 360) - 180;
+      rotationAngle = Math.abs(norm0) <= Math.abs(norm180) ? norm0 : norm180;
+    } else {
+      const rot90 = 90 - angleDeg;
+      const rotM90 = -90 - angleDeg;
+      const norm90 = ((rot90 + 180) % 360) - 180;
+      const normM90 = ((rotM90 + 180) % 360) - 180;
+      rotationAngle = Math.abs(norm90) <= Math.abs(normM90) ? norm90 : normM90;
+    }
+    
+    const h = rectifiedImage.rows;
+    const w = rectifiedImage.cols;
+    const center = new cv.Point(w / 2, h / 2);
+    
+    const M = cv.getRotationMatrix2D(center, rotationAngle, 1.0);
+    
+    // Calculate new size
+    const cos = Math.abs(M.doubleAt(0, 0));
+    const sin = Math.abs(M.doubleAt(0, 1));
+    const newW = Math.round(h * sin + w * cos);
+    const newH = Math.round(h * cos + w * sin);
+    
+    // Adjust translation
+    M.doublePtr(0, 2)[0] += (newW - w) / 2;
+    M.doublePtr(1, 2)[0] += (newH - h) / 2;
+    
+    const aligned = new cv.Mat();
+    cv.warpAffine(rectifiedImage, aligned, M, new cv.Size(newW, newH),
+                  cv.INTER_CUBIC, cv.BORDER_CONSTANT, new cv.Scalar(255, 255, 255, 255));
+    
+    M.delete();
+    
+    showFinalImage(aligned, 'Aligned Image');
+    aligned.delete();
+    
+  } catch (err) {
+    alignResult.innerHTML = `<div class="error"><strong>Error:</strong> ${err.message}</div>`;
+    console.error(err);
+  }
+});
+
+function showFinalImage(mat, title) {
+  // Convert Mat to canvas then to data URL
+  const tempCanvas = document.createElement('canvas');
+  cv.imshow(tempCanvas, mat);
+  const dataUrl = tempCanvas.toDataURL('image/png');
+  
+  alignResult.innerHTML = `
+    <div class="result-section">
+      <h3>${title}</h3>
+      <img src="${dataUrl}" alt="${title}">
+      <div class="result-buttons">
+        <a href="${dataUrl}" download="result.png" class="btn-primary" style="display:inline-block; text-decoration:none; padding: 0.625rem 1.25rem; border-radius: 4px;">
+          Download Image
+        </a>
+      </div>
+    </div>
+  `;
+  
+  alignResult.scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+
+</body>
+</html>
