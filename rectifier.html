@@ -268,6 +268,7 @@
   <div id="loadingOpenCV" class="loading">
     <p><strong>Loading OpenCV...</strong></p>
     <p>Please wait while the image processing library loads (~8MB)</p>
+    <p id="loadingStatus" style="color: #666; font-size: 0.9em; margin-top: 1rem;">Downloading...</p>
   </div>
   
   <div id="mainApp" style="display: none;">
@@ -437,11 +438,23 @@ const alignResult = document.getElementById('alignResult');
 
 // OpenCV ready callback
 function onOpenCvReady() {
-  cv = window.cv;
-  loadingDiv.style.display = 'none';
-  mainApp.style.display = 'block';
-  console.log('OpenCV.js loaded successfully');
+  if (typeof cv !== 'undefined' && cv.Mat) {
+    cv = window.cv;
+    loadingDiv.style.display = 'none';
+    mainApp.style.display = 'block';
+    console.log('OpenCV.js loaded successfully - Version:', cv.getBuildInformation());
+  } else {
+    document.getElementById('loadingStatus').textContent = 'Loading failed. Please refresh the page.';
+    document.getElementById('loadingStatus').style.color = '#f44336';
+  }
 }
+
+// Fallback check if onload doesn't fire
+setTimeout(() => {
+  if (typeof cv !== 'undefined' && cv.Mat && loadingDiv.style.display !== 'none') {
+    onOpenCvReady();
+  }
+}, 3000);
 
 // Keyboard handling
 document.addEventListener('keydown', (e) => {
@@ -469,29 +482,53 @@ fileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
   
+  // Check if OpenCV is loaded
+  if (!cv) {
+    alert('OpenCV is still loading. Please wait a moment and try again.');
+    fileInput.value = '';
+    return;
+  }
+  
   const reader = new FileReader();
   reader.onload = (event) => {
     const img = new Image();
     img.onload = () => {
-      // Store original image
-      srcImage = cv.imread(img);
-      
-      naturalW = img.width;
-      naturalH = img.height;
-      
-      points = [];
-      scale = 1;
-      panX = 0;
-      panY = 0;
-      
-      const containerW = canvasContainer.clientWidth;
-      const containerH = canvasContainer.clientHeight;
-      minScale = Math.min(containerW / naturalW, containerH / naturalH);
-      scale = minScale;
-      
-      canvasContainer.classList.add('active');
-      drawCanvas();
-      updateMarkers();
+      try {
+        // Clean up previous image if exists
+        if (srcImage) {
+          srcImage.delete();
+        }
+        
+        // Store original image
+        srcImage = cv.imread(img);
+        
+        naturalW = img.width;
+        naturalH = img.height;
+        
+        console.log(`Image loaded: ${naturalW} x ${naturalH}`);
+        
+        points = [];
+        scale = 1;
+        panX = 0;
+        panY = 0;
+        
+        const containerW = canvasContainer.clientWidth;
+        const containerH = canvasContainer.clientHeight;
+        minScale = Math.min(containerW / naturalW, containerH / naturalH);
+        scale = minScale;
+        
+        console.log(`Initial scale: ${scale}, container: ${containerW} x ${containerH}`);
+        
+        canvasContainer.classList.add('active');
+        drawCanvas();
+        updateMarkers();
+      } catch (err) {
+        alert('Error loading image: ' + err.message);
+        console.error(err);
+      }
+    };
+    img.onerror = () => {
+      alert('Failed to load image. Please try a different file.');
     };
     img.src = event.target.result;
   };
