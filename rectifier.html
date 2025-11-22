@@ -366,11 +366,43 @@
   </div>
 </div>
 
-<script async src="https://docs.opencv.org/4.5.2/opencv.js" onload="onOpenCvReady()"></script>
-
 <script>
 // Global state
 let cv = null;
+
+// Load OpenCV.js manually with better error handling
+(function() {
+  const script = document.createElement('script');
+  script.src = 'https://docs.opencv.org/4.5.2/opencv.js';
+  script.async = true;
+  
+  script.onload = function() {
+    console.log('OpenCV.js script loaded, waiting for initialization...');
+    // OpenCV needs a moment to initialize after loading
+    const checkInterval = setInterval(() => {
+      if (typeof cv !== 'undefined' && cv.Mat) {
+        clearInterval(checkInterval);
+        onOpenCvReady();
+      }
+    }, 100);
+    
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      clearInterval(checkInterval);
+      if (!cv || !cv.Mat) {
+        document.getElementById('loadingStatus').textContent = 'OpenCV failed to load. Please refresh the page.';
+        document.getElementById('loadingStatus').style.color = '#f44336';
+      }
+    }, 10000);
+  };
+  
+  script.onerror = function() {
+    document.getElementById('loadingStatus').textContent = 'Failed to download OpenCV. Please check your internet connection and refresh.';
+    document.getElementById('loadingStatus').style.color = '#f44336';
+  };
+  
+  document.head.appendChild(script);
+})();
 let shiftHeld = false;
 let points = [];
 let alignPoints = [];
@@ -438,23 +470,13 @@ const alignResult = document.getElementById('alignResult');
 
 // OpenCV ready callback
 function onOpenCvReady() {
-  if (typeof cv !== 'undefined' && cv.Mat) {
-    cv = window.cv;
+  cv = window.cv;
+  if (cv && cv.Mat) {
     loadingDiv.style.display = 'none';
     mainApp.style.display = 'block';
-    console.log('OpenCV.js loaded successfully - Version:', cv.getBuildInformation());
-  } else {
-    document.getElementById('loadingStatus').textContent = 'Loading failed. Please refresh the page.';
-    document.getElementById('loadingStatus').style.color = '#f44336';
+    console.log('OpenCV.js loaded and ready!');
   }
 }
-
-// Fallback check if onload doesn't fire
-setTimeout(() => {
-  if (typeof cv !== 'undefined' && cv.Mat && loadingDiv.style.display !== 'none') {
-    onOpenCvReady();
-  }
-}, 3000);
 
 // Keyboard handling
 document.addEventListener('keydown', (e) => {
