@@ -94,15 +94,18 @@
       color: #555;
     }
 
+    /* Floating editor panel (fixed top-right) */
     #itemEditor {
       position: absolute;
+      top: 20px;
+      right: 20px;
       background: #ffffff;
       border: 1px solid #999;
       border-radius: 6px;
-      padding: 6px 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      padding: 8px 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
       font-size: 12px;
-      z-index: 10;
+      z-index: 9999;
       display: none;
     }
 
@@ -117,7 +120,7 @@
       font-size: 12px;
       padding: 2px 4px;
       margin-bottom: 3px;
-      width: 90px;
+      width: 100px;
     }
 
     #itemEditor button {
@@ -127,24 +130,15 @@
     }
 
     @media print {
-      body {
-        margin: 0;
-        padding: 0;
-        background: #fff;
-      }
-
       header, .controls, .hint, #itemEditor {
         display: none !important;
       }
-
       #main {
         padding: 0;
       }
-
       #canvasContainer {
         border: none;
       }
-
       #layoutCanvas {
         width: 100vw;
         height: 100vh;
@@ -155,6 +149,7 @@
 <body>
 <header>Shop Layout Planner</header>
 
+<!-- CONTROLS -->
 <div class="controls">
   <div class="control-group">
     <label for="roomWidth">Room Width:</label>
@@ -180,20 +175,22 @@
   </div>
 
   <div class="control-group">
-    <button id="saveBtn">Save Layout (Browser)</button>
-    <button id="loadBtn">Load Layout (Browser)</button>
-    <button id="downloadBtn">Download Layout</button>
-    <button id="uploadBtn">Upload Layout</button>
+    <button id="saveBtn">Save (Browser)</button>
+    <button id="loadBtn">Load (Browser)</button>
+    <button id="downloadBtn">Download</button>
+    <button id="uploadBtn">Upload</button>
     <button id="printBtn">Print / PDF</button>
     <input type="file" id="fileInput" accept="application/json" style="display:none;">
   </div>
 </div>
 
+<!-- MAIN AREA -->
 <div id="main">
   <div id="canvasContainer">
     <canvas id="layoutCanvas" tabindex="0"></canvas>
   </div>
 
+  <!-- FLOATING EDITOR -->
   <div id="itemEditor">
     <h4>Edit Item</h4>
     <div>
@@ -210,19 +207,22 @@
     </div>
     <div style="margin-top:4px;">
       <button id="applyEditBtn">Apply</button>
-      <button id="deleteItemBtn" style="border-color:#b00;color:#b00;">Delete</button>
+      <button id="deleteItemBtn" style="border-color:#c00;color:#c00;">Delete</button>
     </div>
   </div>
 
   <div class="hint">
-    <strong>Controls:</strong>
-    Click an item to select. Drag inside the item to move it.
-    Drag the small circle above a selected item to rotate.
-    Use <code>[</code> / <code>]</code> to rotate with the keyboard (snaps near 0°, 90°, 180°, 270°).
+    Click an item to select.  
+    Drag inside the item to move.  
+    Drag the small circle above it to rotate.  
+    Or press [ or ] to rotate with snap.
   </div>
 </div>
 
 <script>
+  /************************************************************
+   * BASIC INITIALIZATION
+   ************************************************************/
   const canvas = document.getElementById('layoutCanvas');
   const ctx = canvas.getContext('2d');
 
@@ -251,32 +251,34 @@
   const applyEditBtn = document.getElementById('applyEditBtn');
   const deleteItemBtn = document.getElementById('deleteItemBtn');
 
-  // Room & scale
+  // Room configuration
   let room = {
-    width: 20,  // in current units
+    width: 20,
     height: 30,
     units: 'ft'
   };
 
-  let scale = 10; // pixels per unit (computed)
-  const padding = 30; // canvas padding inside border
+  let scale = 10;
+  const padding = 30;
 
   // Items
   let items = [];
   let nextItemId = 1;
   let selectedItemId = null;
 
-  // Interaction state
+  // Drag & rotate state
   let isDragging = false;
   let dragItemId = null;
-  let dragOffset = { x: 0, y: 0 }; // in room units
+  let dragOffset = { x: 0, y: 0 };
 
   let isRotating = false;
   let rotateItemId = null;
-  let rotateStartAngle = 0; // radians
-  let rotateStartMouseAngle = 0; // radians
+  let rotateStartAngle = 0;
+  let rotateStartMouseAngle = 0;
 
-  // Resize canvas to container
+  /************************************************************
+   * CANVAS & DRAWING
+   ************************************************************/
   function resizeCanvas() {
     const rect = document.getElementById('canvasContainer').getBoundingClientRect();
     canvas.width = rect.width;
@@ -286,90 +288,77 @@
   }
 
   function computeScale() {
-    if (room.width <= 0 || room.height <= 0) {
-      scale = 10;
-      return;
-    }
     const usableWidth = canvas.width - padding * 2;
     const usableHeight = canvas.height - padding * 2;
     scale = Math.min(usableWidth / room.width, usableHeight / room.height);
   }
 
   function roomToCanvas(x, y) {
-    return {
-      x: padding + x * scale,
-      y: padding + y * scale
-    };
+    return { x: padding + x * scale, y: padding + y * scale };
   }
 
   function canvasToRoom(px, py) {
-    return {
-      x: (px - padding) / scale,
-      y: (py - padding) / scale
-    };
+    return { x: (px - padding) / scale, y: (py - padding) / scale };
   }
 
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Background
-    ctx.fillStyle = '#fdfdfd';
+    // background
+    ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw room border
-    ctx.save();
-    ctx.strokeStyle = '#444';
-    ctx.lineWidth = 2;
-    const topLeft = roomToCanvas(0, 0);
-    const bottomRight = roomToCanvas(room.width, room.height);
-    ctx.strokeRect(topLeft.x, topLeft.y,
-      bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
-    ctx.restore();
-
+    drawRoom();
     drawGrid();
     drawItems();
-    updateItemEditorPosition();
+  }
+
+  function drawRoom() {
+    const tl = roomToCanvas(0,0);
+    const br = roomToCanvas(room.width, room.height);
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
   }
 
   function drawGrid() {
-    const majorSpacing = 1;    // 1 foot (or 1 unit)
-    const minorSpacing = 0.25; // 0.25 unit (3 inches if ft)
+    const major = 1;
+    const minor = 0.25;
 
     ctx.save();
     ctx.lineWidth = 1;
 
-    // Minor grid
-    ctx.strokeStyle = '#e3e3e3';
+    // Minor grid (every 3 inches if ft)
+    ctx.strokeStyle = "#eee";
     ctx.beginPath();
-    for (let x = 0; x <= room.width; x += minorSpacing) {
-      const p1 = roomToCanvas(x, 0);
-      const p2 = roomToCanvas(x, room.height);
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
+    for (let x = 0; x <= room.width; x += minor) {
+      const p1 = roomToCanvas(x,0);
+      const p2 = roomToCanvas(x,room.height);
+      ctx.moveTo(p1.x,p1.y);
+      ctx.lineTo(p2.x,p2.y);
     }
-    for (let y = 0; y <= room.height; y += minorSpacing) {
-      const p1 = roomToCanvas(0, y);
-      const p2 = roomToCanvas(room.width, y);
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
+    for (let y = 0; y <= room.height; y += minor) {
+      const p1 = roomToCanvas(0,y);
+      const p2 = roomToCanvas(room.width,y);
+      ctx.moveTo(p1.x,p1.y);
+      ctx.lineTo(p2.x,p2.y);
     }
     ctx.stroke();
 
-    // Major grid
-    ctx.strokeStyle = '#c1c1c1';
-    ctx.lineWidth = 1.2;
+    // Major grid (every foot)
+    ctx.strokeStyle = "#ccc";
     ctx.beginPath();
-    for (let x = 0; x <= room.width; x += majorSpacing) {
-      const p1 = roomToCanvas(x, 0);
-      const p2 = roomToCanvas(x, room.height);
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
+    for (let x = 0; x <= room.width; x += major) {
+      const p1 = roomToCanvas(x,0);
+      const p2 = roomToCanvas(x,room.height);
+      ctx.moveTo(p1.x,p1.y);
+      ctx.lineTo(p2.x,p2.y);
     }
-    for (let y = 0; y <= room.height; y += majorSpacing) {
-      const p1 = roomToCanvas(0, y);
-      const p2 = roomToCanvas(room.width, y);
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
+    for (let y = 0; y <= room.height; y += major) {
+      const p1 = roomToCanvas(0,y);
+      const p2 = roomToCanvas(room.width,y);
+      ctx.moveTo(p1.x,p1.y);
+      ctx.lineTo(p2.x,p2.y);
     }
     ctx.stroke();
 
@@ -377,465 +366,412 @@
   }
 
   function drawItems() {
-    for (const item of items) {
-      drawItem(item);
-    }
+    for (let item of items) drawItem(item);
   }
 
   function drawItem(item) {
     const center = roomToCanvas(item.x, item.y);
     const wPx = item.width * scale;
     const hPx = item.depth * scale;
-    const handleOffset = 15;
-    const handleRadius = 7;
 
     ctx.save();
     ctx.translate(center.x, center.y);
     ctx.rotate(item.rotation);
 
-    // Body
-    ctx.fillStyle = '#d5e8ff';
-    ctx.strokeStyle = (item.id === selectedItemId) ? '#0066cc' : '#555';
-    ctx.lineWidth = (item.id === selectedItemId) ? 2 : 1.2;
-    ctx.beginPath();
-    ctx.rect(-wPx / 2, -hPx / 2, wPx, hPx);
-    ctx.fill();
-    ctx.stroke();
+    ctx.fillStyle = "#d5e8ff";
+    ctx.strokeStyle = item.id === selectedItemId ? "#06c" : "#555";
+    ctx.lineWidth = item.id === selectedItemId ? 2 : 1.2;
 
-    // Label (keep upright)
-    ctx.fillStyle = '#000';
-    ctx.font = '12px system-ui';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.fillRect(-wPx/2, -hPx/2, wPx, hPx);
+    ctx.strokeRect(-wPx/2, -hPx/2, wPx, hPx);
+
+    // label
     ctx.save();
     ctx.rotate(-item.rotation);
+    ctx.fillStyle = "#000";
+    ctx.font = "12px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.fillText(item.name, 0, 0);
     ctx.restore();
 
     ctx.restore();
 
-    // Rotation handle (draw in canvas space)
-    if (item.id === selectedItemId) {
-      const halfH = hPx / 2;
-      const L = halfH + handleOffset;
-      // local direction (0, -L) rotated by item.rotation:
-      const hx = center.x + L * Math.sin(item.rotation);
-      const hy = center.y - L * Math.cos(item.rotation);
-
-      ctx.save();
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = '#0066cc';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(hx, hy, handleRadius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // small arrow-ish line from center to handle
-      ctx.beginPath();
-      ctx.moveTo(center.x, center.y);
-      ctx.lineTo(hx, hy);
-      ctx.stroke();
-      ctx.restore();
-    }
+    if (item.id === selectedItemId) drawRotateHandle(item);
   }
 
-  function addItem() {
-    const name = itemNameInput.value.trim() || 'Item ' + nextItemId;
-    const w = parseFloat(itemWidthInput.value);
-    const d = parseFloat(itemDepthInput.value);
-    if (!(w > 0) || !(d > 0)) {
-      alert('Please enter valid item dimensions.');
-      return;
-    }
+  function drawRotateHandle(item) {
+    const center = roomToCanvas(item.x, item.y);
+    const hPx = item.depth * scale;
+    const halfH = hPx / 2;
+    const handleOffset = 18;
+    const L = halfH + handleOffset;
 
-    const newItem = {
-      id: nextItemId++,
-      name,
-      width: w,
-      depth: d,
-      x: room.width / 2,
-      y: room.height / 2,
-      rotation: 0
-    };
-    items.push(newItem);
-    selectedItemId = newItem.id;
-    draw();
+    const hx = center.x + L * Math.sin(item.rotation);
+    const hy = center.y - L * Math.cos(item.rotation);
+
+    ctx.save();
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "#06c";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 7, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(center.x, center.y);
+    ctx.lineTo(hx, hy);
+    ctx.stroke();
+    ctx.restore();
   }
 
-  function getItemAtCanvasPoint(px, py) {
-    // check from topmost down
+  /************************************************************
+   * HIT TESTING
+   ************************************************************/
+  function getItemAtPoint(px, py) {
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
-      if (isPointOnRotateHandle(px, py, item)) {
-        return { item, mode: 'rotate' };
+
+      if (isOnRotateHandle(px, py, item)) {
+        return { item, mode: "rotate" };
       }
-      if (isPointInItem(px, py, item)) {
-        return { item, mode: 'move' };
+
+      if (isInsideItem(px, py, item)) {
+        return { item, mode: "move" };
       }
     }
     return null;
   }
 
-  function isPointInItem(px, py, item) {
-    const center = roomToCanvas(item.x, item.y);
-    const dx = px - center.x;
-    const dy = py - center.y;
+  function isInsideItem(px, py, item) {
+    const c = roomToCanvas(item.x,item.y);
+    const dx = px - c.x;
+    const dy = py - c.y;
 
     const cos = Math.cos(-item.rotation);
     const sin = Math.sin(-item.rotation);
 
-    const lx = dx * cos - dy * sin;
-    const ly = dx * sin + dy * cos;
+    const x = dx*cos - dy*sin;
+    const y = dx*sin + dy*cos;
 
-    const halfW = item.width * scale / 2;
-    const halfH = item.depth * scale / 2;
+    const halfW = item.width*scale/2;
+    const halfH = item.depth*scale/2;
 
-    return (lx >= -halfW && lx <= halfW && ly >= -halfH && ly <= halfH);
+    return (x >= -halfW && x <= halfW && y >= -halfH && y <= halfH);
   }
 
-  function isPointOnRotateHandle(px, py, item) {
-    const center = roomToCanvas(item.x, item.y);
-    const wPx = item.width * scale;
+  function isOnRotateHandle(px, py, item) {
+    const center = roomToCanvas(item.x,item.y);
     const hPx = item.depth * scale;
-    const halfH = hPx / 2;
-    const handleOffset = 15;
-    const handleRadius = 9;
+    const halfH = hPx/2;
+    const offset = 18;
+    const L = halfH + offset;
 
-    const L = halfH + handleOffset;
-    const hx = center.x + L * Math.sin(item.rotation);
-    const hy = center.y - L * Math.cos(item.rotation);
+    const hx = center.x + L*Math.sin(item.rotation);
+    const hy = center.y - L*Math.cos(item.rotation);
 
     const dx = px - hx;
     const dy = py - hy;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    return dist <= handleRadius;
+    return Math.sqrt(dx*dx + dy*dy) <= 9;
   }
 
-  // Mouse events
-  canvas.addEventListener('mousedown', (e) => {
+  /************************************************************
+   * MOUSE CONTROLS
+   ************************************************************/
+  canvas.addEventListener("mousedown", e => {
     const rect = canvas.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
 
-    const hit = getItemAtCanvasPoint(px, py);
-    if (hit && hit.item) {
+    const hit = getItemAtPoint(px, py);
+
+    if (hit) {
       selectedItemId = hit.item.id;
-      const item = hit.item;
 
-      if (hit.mode === 'move') {
-        const roomPt = canvasToRoom(px, py);
-        dragOffset.x = roomPt.x - item.x;
-        dragOffset.y = roomPt.y - item.y;
-        dragItemId = item.id;
+      if (hit.mode === "move") {
         isDragging = true;
-        isRotating = false;
-        rotateItemId = null;
-      } else if (hit.mode === 'rotate') {
-        const center = roomToCanvas(item.x, item.y);
-        rotateItemId = item.id;
-        isRotating = true;
-        isDragging = false;
-        dragItemId = null;
-
-        rotateStartAngle = item.rotation;
-        rotateStartMouseAngle = Math.atan2(py - center.y, px - center.x);
+        dragItemId = hit.item.id;
+        const rp = canvasToRoom(px, py);
+        dragOffset.x = rp.x - hit.item.x;
+        dragOffset.y = rp.y - hit.item.y;
       }
+
+      if (hit.mode === "rotate") {
+        isRotating = true;
+        rotateItemId = hit.item.id;
+
+        const center = roomToCanvas(hit.item.x, hit.item.y);
+        rotateStartMouseAngle = Math.atan2(py - center.y, px - center.x);
+        rotateStartAngle = hit.item.rotation;
+      }
+
       draw();
+      showEditor();
     } else {
       selectedItemId = null;
-      isDragging = false;
-      dragItemId = null;
-      isRotating = false;
-      rotateItemId = null;
+      hideEditor();
       draw();
     }
-
-    canvas.focus();
   });
 
-  canvas.addEventListener('mousemove', (e) => {
+  canvas.addEventListener("mousemove", e => {
     const rect = canvas.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
 
     if (isDragging && dragItemId != null) {
-      const item = items.find(it => it.id === dragItemId);
-      if (!item) return;
+      const item = items.find(i => i.id === dragItemId);
+      const rp = canvasToRoom(px, py);
+      item.x = rp.x - dragOffset.x;
+      item.y = rp.y - dragOffset.y;
 
-      const roomPt = canvasToRoom(px, py);
-      item.x = roomPt.x - dragOffset.x;
-      item.y = roomPt.y - dragOffset.y;
-
-      // keep roughly inside room
-      item.x = Math.max(item.width / 2, Math.min(room.width - item.width / 2, item.x));
-      item.y = Math.max(item.depth / 2, Math.min(room.height - item.depth / 2, item.y));
+      // Keep inside room
+      item.x = Math.max(item.width/2, Math.min(room.width - item.width/2, item.x));
+      item.y = Math.max(item.depth/2, Math.min(room.height - item.depth/2, item.y));
 
       draw();
-    } else if (isRotating && rotateItemId != null) {
-      const item = items.find(it => it.id === rotateItemId);
-      if (!item) return;
+      showEditor();
+    }
+
+    if (isRotating && rotateItemId != null) {
+      const item = items.find(i => i.id === rotateItemId);
 
       const center = roomToCanvas(item.x, item.y);
-      const currentMouseAngle = Math.atan2(py - center.y, px - center.x);
-      let delta = currentMouseAngle - rotateStartMouseAngle;
-      item.rotation = rotateStartAngle + delta;
+      const mouseAngle = Math.atan2(py - center.y, px - center.x);
+      item.rotation = rotateStartAngle + (mouseAngle - rotateStartMouseAngle);
+
       snapRotation(item);
       draw();
+      showEditor();
     }
   });
 
-  window.addEventListener('mouseup', () => {
+  window.addEventListener("mouseup", () => {
     isDragging = false;
     dragItemId = null;
+
     isRotating = false;
     rotateItemId = null;
   });
 
-  // Keyboard rotation
-  document.addEventListener('keydown', (e) => {
-    if (!selectedItemId) return;
-    const item = items.find(it => it.id === selectedItemId);
-    if (!item) return;
-
-    const stepDeg = 5;
-    const stepRad = stepDeg * Math.PI / 180;
-
-    if (e.key === '[') {
-      item.rotation -= stepRad;
-      snapRotation(item);
-      draw();
-      e.preventDefault();
-    } else if (e.key === ']') {
-      item.rotation += stepRad;
-      snapRotation(item);
-      draw();
-      e.preventDefault();
-    }
-  });
-
+  /************************************************************
+   * ROTATION SNAPPING
+   ************************************************************/
   function snapRotation(item) {
-    // Snap to 0, 90, 180, 270 when within 5 degrees
-    const snapAngles = [0, 90, 180, 270].map(a => a * Math.PI / 180);
-    let angle = item.rotation;
+    const targets = [0, 90, 180, 270].map(a => a*Math.PI/180);
+    let a = item.rotation;
 
-    // normalize [0, 2π)
-    angle = angle % (2 * Math.PI);
-    if (angle < 0) angle += 2 * Math.PI;
+    a = a % (2*Math.PI);
+    if (a < 0) a += 2*Math.PI;
 
-    let closest = angle;
-    let minDiff = Infinity;
-    for (const target of snapAngles) {
-      let diff = Math.abs(angle - target);
-      diff = Math.min(diff, 2 * Math.PI - diff);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closest = target;
-      }
+    let closest = a;
+    let minDiff = 999;
+    for (let t of targets) {
+      let diff = Math.abs(a - t);
+      diff = Math.min(diff, 2*Math.PI - diff);
+      if (diff < minDiff) { minDiff = diff; closest = t; }
     }
 
-    const threshold = 5 * Math.PI / 180; // 5 degrees
-    if (minDiff < threshold) {
-      angle = closest;
+    if (minDiff < 5*Math.PI/180) {
+      item.rotation = closest;
     }
-
-    item.rotation = angle;
   }
 
-  // Room & item controls
-  applyRoomBtn.addEventListener('click', () => {
-    const w = parseFloat(roomWidthInput.value);
-    const h = parseFloat(roomHeightInput.value);
-    const units = roomUnitsSelect.value;
-    if (!(w > 0) || !(h > 0)) {
-      alert('Please enter valid room dimensions.');
+  /************************************************************
+   * KEYBOARD FOR ROTATION
+   ************************************************************/
+  document.addEventListener("keydown", e => {
+    if (!selectedItemId) return;
+    const item = items.find(i => i.id === selectedItemId);
+
+    const step = 5*Math.PI/180;
+    if (e.key === '[') {
+      item.rotation -= step;
+      snapRotation(item);
+      draw();
+      showEditor();
+    }
+    if (e.key === ']') {
+      item.rotation += step;
+      snapRotation(item);
+      draw();
+      showEditor();
+    }
+  });
+
+  /************************************************************
+   * ADD ITEM
+   ************************************************************/
+  addItemBtn.addEventListener("click", () => {
+    const name = itemNameInput.value.trim() || ("Item " + nextItemId);
+    const w = parseFloat(itemWidthInput.value);
+    const d = parseFloat(itemDepthInput.value);
+
+    if (!(w > 0 && d > 0)) {
+      alert("Enter valid dimensions.");
       return;
     }
-    room.width = w;
-    room.height = h;
-    room.units = units;
-    itemUnitsLabel.textContent = (units === 'ft' ? 'ft' : units);
-    computeScale();
+
+    const item = {
+      id: nextItemId++,
+      name,
+      width: w,
+      depth: d,
+      x: room.width/2,
+      y: room.height/2,
+      rotation: 0
+    };
+
+    items.push(item);
+    selectedItemId = item.id;
     draw();
+    showEditor();
   });
 
-  roomUnitsSelect.addEventListener('change', () => {
-    itemUnitsLabel.textContent = (roomUnitsSelect.value === 'ft' ? 'ft' : roomUnitsSelect.value);
-  });
-
-  addItemBtn.addEventListener('click', addItem);
-
-  // Floating editor
-  function updateItemEditorPosition() {
-    const item = items.find(it => it.id === selectedItemId);
+  /************************************************************
+   * EDITOR PANEL
+   ************************************************************/
+  function showEditor() {
+    const item = items.find(i => i.id === selectedItemId);
     if (!item) {
-      itemEditor.style.display = 'none';
+      hideEditor();
       return;
     }
 
-    // set values
     editNameInput.value = item.name;
-    editWidthInput.value = item.width.toFixed(2).replace(/\.00$/, '');
-    editDepthInput.value = item.depth.toFixed(2).replace(/\.00$/, '');
+    editWidthInput.value = item.width;
+    editDepthInput.value = item.depth;
 
-    // position near item center
-    const center = roomToCanvas(item.x, item.y);
-    let left = center.x + 14;
-    let top = center.y + 14;
-
-    // keep inside main container bounds a bit
-    const mainRect = document.getElementById('main').getBoundingClientRect();
-    const editorRect = itemEditor.getBoundingClientRect();
-
-    if (left + editorRect.width > mainRect.width - 10) {
-      left = center.x - editorRect.width - 14;
-    }
-    if (top + editorRect.height > mainRect.height - 10) {
-      top = center.y - editorRect.height - 14;
-    }
-
-    itemEditor.style.left = left + 'px';
-    itemEditor.style.top = top + 'px';
-    itemEditor.style.display = 'block';
+    itemEditor.style.display = "block";
   }
 
-  applyEditBtn.addEventListener('click', () => {
-    const item = items.find(it => it.id === selectedItemId);
+  function hideEditor() {
+    itemEditor.style.display = "none";
+  }
+
+  applyEditBtn.addEventListener("click", () => {
+    const item = items.find(i => i.id === selectedItemId);
     if (!item) return;
 
-    const newName = editNameInput.value.trim() || item.name;
-    const newW = parseFloat(editWidthInput.value);
-    const newD = parseFloat(editDepthInput.value);
+    const n = editNameInput.value.trim();
+    const w = parseFloat(editWidthInput.value);
+    const d = parseFloat(editDepthInput.value);
 
-    if (!(newW > 0) || !(newD > 0)) {
-      alert('Please enter valid width and depth.');
+    if (!(w > 0 && d > 0)) {
+      alert("Enter valid width/depth.");
       return;
     }
 
-    item.name = newName;
-    item.width = newW;
-    item.depth = newD;
+    item.name = n || item.name;
+    item.width = w;
+    item.depth = d;
 
     // keep inside room
-    item.x = Math.max(item.width / 2, Math.min(room.width - item.width / 2, item.x));
-    item.y = Math.max(item.depth / 2, Math.min(room.height - item.depth / 2, item.y));
+    item.x = Math.max(w/2, Math.min(room.width - w/2, item.x));
+    item.y = Math.max(d/2, Math.min(room.height - d/2, item.y));
 
     draw();
   });
 
-  deleteItemBtn.addEventListener('click', () => {
-    if (!selectedItemId) return;
-    items = items.filter(it => it.id !== selectedItemId);
+  deleteItemBtn.addEventListener("click", () => {
+    items = items.filter(i => i.id !== selectedItemId);
     selectedItemId = null;
     draw();
+    hideEditor();
   });
 
-  // Save / Load (browser localStorage)
-  function saveLayoutLocal() {
-    const data = {
-      version: 1,
-      room,
-      items,
-      nextItemId
-    };
-    try {
-      localStorage.setItem('shopLayout', JSON.stringify(data));
-      alert('Layout saved in this browser.');
-    } catch (err) {
-      console.error(err);
-      alert('Unable to save layout (localStorage error).');
-    }
-  }
+  /************************************************************
+   * SAVE / LOAD (localStorage)
+   ************************************************************/
+  saveBtn.addEventListener("click", () => {
+    const data = JSON.stringify({ room, items, nextItemId });
+    localStorage.setItem("shopLayout", data);
+    alert("Saved in browser.");
+  });
 
-  function loadLayoutLocal() {
-    const raw = localStorage.getItem('shopLayout');
-    if (!raw) {
-      alert('No saved layout found in this browser.');
-      return;
-    }
-    try {
-      const data = JSON.parse(raw);
-      restoreLayoutFromData(data);
-    } catch (err) {
-      console.error(err);
-      alert('Error loading layout.');
-    }
-  }
+  loadBtn.addEventListener("click", () => {
+    const data = localStorage.getItem("shopLayout");
+    if (!data) return alert("No layout saved in browser.");
 
-  function restoreLayoutFromData(data) {
-    room = data.room || room;
-    items = data.items || [];
-    nextItemId = data.nextItemId || (items.reduce((m, it) => Math.max(m, it.id), 0) + 1);
-
-    roomWidthInput.value = room.width;
-    roomHeightInput.value = room.height;
-    roomUnitsSelect.value = room.units || 'ft';
-    itemUnitsLabel.textContent = (room.units === 'ft' ? 'ft' : room.units);
-
-    computeScale();
-    selectedItemId = null;
+    const obj = JSON.parse(data);
+    room = obj.room;
+    items = obj.items;
+    nextItemId = obj.nextItemId;
     draw();
-  }
+    hideEditor();
+  });
 
-  saveBtn.addEventListener('click', saveLayoutLocal);
-  loadBtn.addEventListener('click', loadLayoutLocal);
-
-  // Download / Upload
-  function downloadLayoutFile() {
-    const data = {
-      version: 1,
-      room,
-      items,
-      nextItemId
-    };
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
+  /************************************************************
+   * DOWNLOAD / UPLOAD FILE
+   ************************************************************/
+  downloadBtn.addEventListener("click", () => {
+    const data = JSON.stringify({ room, items, nextItemId }, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
-    const dateStr = new Date().toISOString().slice(0,10);
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `shop_layout_${dateStr}.json`;
-    document.body.appendChild(a);
+    a.download = "shop_layout.json";
     a.click();
-    document.body.removeChild(a);
+
     URL.revokeObjectURL(url);
-  }
-
-  function uploadLayoutFile() {
-    fileInput.click();
-  }
-
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const data = JSON.parse(evt.target.result);
-        restoreLayoutFromData(data);
-      } catch (err) {
-        console.error(err);
-        alert('Error reading layout file.');
-      }
-    };
-    reader.readAsText(file);
-    // reset input so you can upload same file again if needed
-    fileInput.value = '';
   });
 
-  downloadBtn.addEventListener('click', downloadLayoutFile);
-  uploadBtn.addEventListener('click', uploadLayoutFile);
+  uploadBtn.addEventListener("click", () => {
+    fileInput.click();
+  });
 
-  // Print
-  printBtn.addEventListener('click', () => {
+  fileInput.addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = evt => {
+      const obj = JSON.parse(evt.target.result);
+      room = obj.room;
+      items = obj.items;
+      nextItemId = obj.nextItemId;
+      draw();
+      hideEditor();
+    };
+    reader.readAsText(file);
+
+    fileInput.value = "";
+  });
+
+  /************************************************************
+   * PRINT
+   ************************************************************/
+  printBtn.addEventListener("click", () => {
     window.print();
   });
 
-  // Init
-  window.addEventListener('resize', resizeCanvas);
+  /************************************************************
+   * ROOM SETTINGS
+   ************************************************************/
+  applyRoomBtn.addEventListener("click", () => {
+    const w = parseFloat(roomWidthInput.value);
+    const h = parseFloat(roomHeightInput.value);
 
-  // Initial setup
+    if (!(w > 0 && h > 0)) return alert("Enter valid room dimensions.");
+
+    room.width = w;
+    room.height = h;
+    room.units = roomUnitsSelect.value;
+
+    computeScale();
+    draw();
+  });
+
+  roomUnitsSelect.addEventListener("change", () => {
+    itemUnitsLabel.textContent = roomUnitsSelect.value;
+  });
+
+  /************************************************************
+   * INIT
+   ************************************************************/
+  window.addEventListener("resize", resizeCanvas);
   resizeCanvas();
   draw();
 </script>
