@@ -138,9 +138,9 @@
 <div class="controls">
   <div class="control-group">
     <label>Room Width:</label>
-    <input type="number" id="roomWidth" value="20" step="0.1">
+    <input type="number" id="roomWidth" value="20" step="any">
     <label>Height:</label>
-    <input type="number" id="roomHeight" value="30" step="0.1">
+    <input type="number" id="roomHeight" value="30" step="any">
     <select id="roomUnits">
       <option value="ft">Feet</option>
       <option value="m">Meters</option>
@@ -152,9 +152,9 @@
     <label>Item:</label>
     <input type="text" id="itemName" placeholder="Tablesaw" size="10">
     <label>W:</label>
-    <input type="number" id="itemWidth" value="3" step="0.1">
+    <input type="number" id="itemWidth" value="3" step="any">
     <label>D:</label>
-    <input type="number" id="itemDepth" value="2" step="0.1">
+    <input type="number" id="itemDepth" value="2" step="any">
     <button id="addItemBtn">Add Item</button>
   </div>
 
@@ -186,13 +186,13 @@
       <input type="text" id="editName">
 
       <label>Width:</label>
-      <input type="number" id="editWidth" step="0.1">
+      <input type="number" id="editWidth" step="any">
 
       <label>Depth:</label>
-      <input type="number" id="editDepth" step="0.1">
+      <input type="number" id="editDepth" step="any">
 
       <label>Rotation (deg):</label>
-      <input type="number" id="editRotation" step="1">
+      <input type="number" id="editRotation" step="any">
 
       <button id="applyEditBtn">Apply Changes</button>
       <button id="deleteItemBtn" class="danger">Delete</button>
@@ -518,31 +518,35 @@ function updateSidebar(){
   document.getElementById("editName").value=item.name;
   document.getElementById("editWidth").value=item.width;
   document.getElementById("editDepth").value=item.depth;
-  document.getElementById("editRotation").value=(item.rotation*180/Math.PI).toFixed(1);
+  document.getElementById("editRotation").value=(item.rotation*180/Math.PI).toFixed(2);
 }
 
 document.getElementById("applyEditBtn").addEventListener("click", ()=>{
   const item=items.find(i=>i.id===selectedItemId);
   if(!item)return;
 
+  // Name
   item.name=document.getElementById("editName").value;
 
-  const w=parseFloat(document.getElementById("editWidth").value);
-  const d=parseFloat(document.getElementById("editDepth").value);
-  const r=parseFloat(document.getElementById("editRotation").value);
+  // Width & depth with safe fallbacks
+  let w=parseFloat(document.getElementById("editWidth").value);
+  let d=parseFloat(document.getElementById("editDepth").value);
+  if(!(w>0)) w=item.width;
+  if(!(d>0)) d=item.depth;
 
-  if(w>0 && d>0){
-    item.width=w; 
-    item.depth=d;
-  }
+  item.width=w;
+  item.depth=d;
 
-  if(!isNaN(r)){
-    item.rotation=r*Math.PI/180;
+  // Rotation in degrees
+  let rDeg=parseFloat(document.getElementById("editRotation").value);
+  if(!isNaN(rDeg)){
+    item.rotation=rDeg*Math.PI/180;
     snapRotation(item);
   }
 
-  item.x=Math.max(w/2, Math.min(room.width-w/2, item.x));
-  item.y=Math.max(d/2, Math.min(room.height-d/2, item.y));
+  // Clamp using updated size
+  item.x=Math.max(item.width/2, Math.min(room.width-item.width/2, item.x));
+  item.y=Math.max(item.depth/2, Math.min(room.height-item.depth/2, item.y));
 
   draw(); 
   updateSidebar();
