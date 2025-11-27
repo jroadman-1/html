@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Shop Layout Planner</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: #f5f5f5;
+    }
+
+    header {
+      padding: 8px 12px;
+      background: #333;
+      color: #fff;
+      font-size: 18px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 10px 12px;
+      background: #fafafa;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .control-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    label {
+      font-weight: 500;
+    }
+
+    input[type="number"],
+    input[type="text"],
+    select {
+      padding: 3px 6px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: 1px solid #bbb;
+      min-width: 60px;
+    }
+
+    button {
+      padding: 4px 10px;
+      font-size: 13px;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #eee;
+    }
+
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 8px 12px 12px 12px;
+      box-sizing: border-box;
+      gap: 8px;
+    }
+
+    #canvasContainer {
+      flex: 1;
+      border: 1px solid #ccc;
+      background: #fff;
+      position: relative;
+    }
+
+    #layoutCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      outline: none;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #555;
+    }
+
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+        background: #fff;
+      }
+
+      header, .controls, .hint {
+        display: none !important;
+      }
+
+      #main {
+        padding: 0;
+      }
+
+      #canvasContainer {
+        border: none;
+      }
+
+      #layoutCanvas {
+        width: 100vw;
+        height: 100vh;
+      }
+    }
+  </style>
+</head>
+<body>
+<header>Shop Layout Planner</header>
+
+<div class="controls">
+  <div class="control-group">
+    <label for="roomWidth">Room Width:</label>
+    <input type="number" id="roomWidth" value="20" min="1" step="0.1">
+    <label for="roomHeight">Room Height:</label>
+    <input type="number" id="roomHeight" value="30" min="1" step="0.1">
+    <select id="roomUnits">
+      <option value="ft">Feet</option>
+      <option value="m">Meters</option>
+    </select>
+    <button id="applyRoomBtn">Apply Room</button>
+  </div>
+
+  <div class="control-group">
+    <label for="itemName">Item:</label>
+    <input type="text" id="itemName" placeholder="Tablesaw" size="10">
+    <label for="itemWidth">W:</label>
+    <input type="number" id="itemWidth" value="3" min="0.1" step="0.1">
+    <label for="itemDepth">D:</label>
+    <input type="number" id="itemDepth" value="2" min="0.1" step="0.1">
+    <span id="itemUnitsLabel">ft</span>
+    <button id="addItemBtn">Add Item</button>
+  </div>
+
+  <div class="control-group">
+    <button id="saveBtn">Save Layout</button>
+    <button id="loadBtn">Load Layout</button>
+    <button id="printBtn">Print / PDF</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="canvasContainer">
+    <canvas id="layoutCanvas" tabindex="0"></canvas>
+  </div>
+  <div class="hint">
+    <strong>Controls:</strong>
+    Click item to select. Drag with mouse to move.
+    Use <code>[</code> / <code>]</code> to rotate selected item.
+    Rotation snaps to 0°, 90°, 180°, 270° when close.
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('layoutCanvas');
+  const ctx = canvas.getContext('2d');
+
+  const roomWidthInput = document.getElementById('roomWidth');
+  const roomHeightInput = document.getElementById('roomHeight');
+  const roomUnitsSelect = document.getElementById('roomUnits');
+  const applyRoomBtn = document.getElementById('applyRoomBtn');
+
+  const itemNameInput = document.getElementById('itemName');
+  const itemWidthInput = document.getElementById('itemWidth');
+  const itemDepthInput = document.getElementById('itemDepth');
+  const itemUnitsLabel = document.getElementById('itemUnitsLabel');
+  const addItemBtn = document.getElementById('addItemBtn');
+
+  const saveBtn = document.getElementById('saveBtn');
+  const loadBtn = document.getElementById('loadBtn');
+  const printBtn = document.getElementById('printBtn');
+
+  // Room & scale
+  let room = {
+    width: 20,  // in current units
+    height: 30,
+    units: 'ft'
+  };
+
+  let scale = 10; // pixels per unit (computed)
+  const padding = 30; // canvas padding inside border
+
+  // Items
+  let items = [];
+  let nextItemId = 1;
+  let selectedItemId = null;
+
+  // Drag state
+  let isDragging = false;
+  let dragOffset = { x: 0, y: 0 }; // in room units
+  let dragItemId = null;
+
+  // Resize canvas to container
+  function resizeCanvas() {
+    const rect = document.getElementById('canvasContainer').getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    computeScale();
+    draw();
+  }
+
+  function computeScale() {
+    if (room.width <= 0 || room.height <= 0) {
+      scale = 10;
+      return;
+    }
+    const usableWidth = canvas.width - padding * 2;
+    const usableHeight = canvas.height - padding * 2;
+    scale = Math.min(usableWidth / room.width, usableHeight / room.height);
+  }
+
+  function roomToCanvas(x, y) {
+    return {
+      x: padding + x * scale,
+      y: padding + y * scale
+    };
+  }
+
+  function canvasToRoom(px, py) {
+    return {
+      x: (px - padding) / scale,
+      y: (py - padding) / scale
+    };
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Background
+    ctx.fillStyle = '#fdfdfd';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw room border
+    ctx.save();
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 2;
+    const topLeft = roomToCanvas(0, 0);
+    const bottomRight = roomToCanvas(room.width, room.height);
+    ctx.strokeRect(topLeft.x, topLeft.y,
+      bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+    ctx.restore();
+
+    drawGrid();
+    drawItems();
+  }
+
+  function drawGrid() {
+    const majorSpacing = 1;    // 1 foot
+    const minorSpacing = 0.25; // 3 inches (0.25 ft)
+
+    ctx.save();
+    ctx.lineWidth = 1;
+
+    // Minor grid
+    ctx.strokeStyle = '#e3e3e3';
+    ctx.beginPath();
+    for (let x = 0; x <= room.width; x += minorSpacing) {
+      const p1 = roomToCanvas(x, 0);
+      const p2 = roomToCanvas(x, room.height);
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+    }
+    for (let y = 0; y <= room.height; y += minorSpacing) {
+      const p1 = roomToCanvas(0, y);
+      const p2 = roomToCanvas(room.width, y);
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+    }
+    ctx.stroke();
+
+    // Major grid
+    ctx.strokeStyle = '#c1c1c1';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let x = 0; x <= room.width; x += majorSpacing) {
+      const p1 = roomToCanvas(x, 0);
+      const p2 = roomToCanvas(x, room.height);
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+    }
+    for (let y = 0; y <= room.height; y += majorSpacing) {
+      const p1 = roomToCanvas(0, y);
+      const p2 = roomToCanvas(room.width, y);
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+    }
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawItems() {
+    for (const item of items) {
+      drawItem(item);
+    }
+  }
+
+  function drawItem(item) {
+    const center = roomToCanvas(item.x, item.y);
+    const wPx = item.width * scale;
+    const hPx = item.depth * scale;
+
+    ctx.save();
+    ctx.translate(center.x, center.y);
+    ctx.rotate(item.rotation);
+
+    // Body
+    ctx.fillStyle = '#d5e8ff';
+    ctx.strokeStyle = (item.id === selectedItemId) ? '#0066cc' : '#555';
+    ctx.lineWidth = (item.id === selectedItemId) ? 2 : 1.2;
+    ctx.beginPath();
+    ctx.rect(-wPx / 2, -hPx / 2, wPx, hPx);
+    ctx.fill();
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = '#000';
+    ctx.font = '12px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.save();
+    ctx.rotate(-item.rotation); // keep label readable upright
+    ctx.fillText(item.name, 0, 0);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  function addItem() {
+    const name = itemNameInput.value.trim() || 'Item ' + nextItemId;
+    const w = parseFloat(itemWidthInput.value);
+    const d = parseFloat(itemDepthInput.value);
+    if (!(w > 0) || !(d > 0)) {
+      alert('Please enter valid item dimensions.');
+      return;
+    }
+
+    const newItem = {
+      id: nextItemId++,
+      name,
+      width: w,
+      depth: d,
+      x: room.width / 2,
+      y: room.height / 2,
+      rotation: 0
+    };
+    items.push(newItem);
+    selectedItemId = newItem.id;
+    draw();
+  }
+
+  function getItemAtCanvasPoint(px, py) {
+    // Check items from topmost to bottom
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      if (isPointInItem(px, py, item)) return item;
+    }
+    return null;
+  }
+
+  function isPointInItem(px, py, item) {
+    const center = roomToCanvas(item.x, item.y);
+    const dx = px - center.x;
+    const dy = py - center.y;
+
+    const cos = Math.cos(-item.rotation);
+    const sin = Math.sin(-item.rotation);
+
+    const lx = dx * cos - dy * sin;
+    const ly = dx * sin + dy * cos;
+
+    const halfW = item.width * scale / 2;
+    const halfH = item.depth * scale / 2;
+
+    return (lx >= -halfW && lx <= halfW && ly >= -halfH && ly <= halfH);
+  }
+
+  // Mouse events for dragging
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+
+    const item = getItemAtCanvasPoint(px, py);
+    if (item) {
+      selectedItemId = item.id;
+      const roomPt = canvasToRoom(px, py);
+      dragOffset.x = roomPt.x - item.x;
+      dragOffset.y = roomPt.y - item.y;
+      dragItemId = item.id;
+      isDragging = true;
+      draw();
+    } else {
+      selectedItemId = null;
+      draw();
+    }
+
+    canvas.focus();
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!isDragging || dragItemId == null) return;
+    const item = items.find(it => it.id === dragItemId);
+    if (!item) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const roomPt = canvasToRoom(px, py);
+
+    item.x = roomPt.x - dragOffset.x;
+    item.y = roomPt.y - dragOffset.y;
+
+    // Keep inside room bounds (roughly)
+    item.x = Math.max(item.width / 2, Math.min(room.width - item.width / 2, item.x));
+    item.y = Math.max(item.depth / 2, Math.min(room.height - item.depth / 2, item.y));
+
+    draw();
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+    dragItemId = null;
+  });
+
+  // Keyboard for rotation
+  document.addEventListener('keydown', (e) => {
+    if (!selectedItemId) return;
+    const item = items.find(it => it.id === selectedItemId);
+    if (!item) return;
+
+    const stepDeg = 5;
+    const stepRad = stepDeg * Math.PI / 180;
+
+    if (e.key === '[') {
+      item.rotation -= stepRad;
+      snapRotation(item);
+      draw();
+      e.preventDefault();
+    } else if (e.key === ']') {
+      item.rotation += stepRad;
+      snapRotation(item);
+      draw();
+      e.preventDefault();
+    }
+  });
+
+  function snapRotation(item) {
+    // Snap to 0, 90, 180, 270 when within 5 degrees
+    const snapAngles = [0, 90, 180, 270].map(a => a * Math.PI / 180);
+    let angle = item.rotation;
+
+    // Normalize angle to [0, 2π)
+    angle = angle % (2 * Math.PI);
+    if (angle < 0) angle += 2 * Math.PI;
+
+    let closest = angle;
+    let minDiff = Infinity;
+    for (const target of snapAngles) {
+      let diff = Math.abs(angle - target);
+      diff = Math.min(diff, 2 * Math.PI - diff);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = target;
+      }
+    }
+
+    const threshold = 5 * Math.PI / 180; // 5 degrees
+    if (minDiff < threshold) {
+      angle = closest;
+    }
+
+    item.rotation = angle;
+  }
+
+  // Room & item controls
+  applyRoomBtn.addEventListener('click', () => {
+    const w = parseFloat(roomWidthInput.value);
+    const h = parseFloat(roomHeightInput.value);
+    const units = roomUnitsSelect.value;
+    if (!(w > 0) || !(h > 0)) {
+      alert('Please enter valid room dimensions.');
+      return;
+    }
+    room.width = w;
+    room.height = h;
+    room.units = units;
+    itemUnitsLabel.textContent = (units === 'ft' ? 'ft' : units);
+    computeScale();
+    draw();
+  });
+
+  roomUnitsSelect.addEventListener('change', () => {
+    // Just update label; values are assumed in the chosen units
+    itemUnitsLabel.textContent = (roomUnitsSelect.value === 'ft' ? 'ft' : roomUnitsSelect.value);
+  });
+
+  addItemBtn.addEventListener('click', addItem);
+
+  // Save / Load
+  function saveLayout() {
+    const data = {
+      version: 1,
+      room,
+      items,
+      nextItemId
+    };
+    try {
+      localStorage.setItem('shopLayout', JSON.stringify(data));
+      alert('Layout saved.');
+    } catch (err) {
+      console.error(err);
+      alert('Unable to save layout (localStorage error).');
+    }
+  }
+
+  function loadLayout() {
+    const raw = localStorage.getItem('shopLayout');
+    if (!raw) {
+      alert('No saved layout found.');
+      return;
+    }
+    try {
+      const data = JSON.parse(raw);
+      room = data.room || room;
+      items = data.items || [];
+      nextItemId = data.nextItemId || (items.reduce((m, it) => Math.max(m, it.id), 0) + 1);
+
+      roomWidthInput.value = room.width;
+      roomHeightInput.value = room.height;
+      roomUnitsSelect.value = room.units || 'ft';
+      itemUnitsLabel.textContent = (room.units === 'ft' ? 'ft' : room.units);
+
+      computeScale();
+      draw();
+    } catch (err) {
+      console.error(err);
+      alert('Error loading layout.');
+    }
+  }
+
+  saveBtn.addEventListener('click', saveLayout);
+  loadBtn.addEventListener('click', loadLayout);
+
+  printBtn.addEventListener('click', () => {
+    window.print();
+  });
+
+  // Init
+  window.addEventListener('resize', resizeCanvas);
+
+  // Initial setup
+  resizeCanvas();
+  draw();
+</script>
+
+</body>
+</html>
