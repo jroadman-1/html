@@ -1,161 +1,146 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Shop Layout Planner</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      background: #f5f5f5;
-    }
+<meta charset="UTF-8">
+<title>Shop Layout Planner</title>
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #f5f5f5;
+  }
 
-    header {
-      padding: 8px 12px;
-      background: #333;
-      color: #fff;
-      font-size: 18px;
-    }
+  header {
+    padding: 8px 12px;
+    background: #333;
+    color: #fff;
+    font-size: 18px;
+  }
 
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 10px 12px;
-      background: #fafafa;
-      border-bottom: 1px solid #ddd;
-    }
+  /* Top controls bar */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #fafafa;
+    border-bottom: 1px solid #ddd;
+  }
+  .control-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    font-size: 14px;
+  }
 
-    .control-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: center;
-      font-size: 14px;
-    }
+  button, input, select {
+    border-radius: 4px;
+    border: 1px solid #888;
+    padding: 4px 6px;
+    font-size: 14px;
+  }
+  button:hover { background: #eee; }
 
-    label {
-      font-weight: 500;
-    }
+  /* Layout: canvas left, sidebar right */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+  }
 
-    input[type="number"],
-    input[type="text"],
-    select {
-      padding: 3px 6px;
-      font-size: 14px;
-      border-radius: 4px;
-      border: 1px solid #bbb;
-      min-width: 60px;
-    }
+  #canvasContainer {
+    flex: 1;
+    min-width: 300px;
+    border-right: 1px solid #ccc;
+    background: #fff;
+    display: flex;
+    position: relative;
+  }
 
-    button {
-      padding: 4px 10px;
-      font-size: 13px;
-      border-radius: 4px;
-      border: 1px solid #444;
-      background: #fff;
-      cursor: pointer;
-    }
+  #layoutCanvas {
+    flex: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+    outline: none;
+  }
 
-    button:hover {
-      background: #eee;
-    }
+  /* Sidebar */
+  #sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: #f9f9f9;
+    border-left: 1px solid #ccc;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
 
-    #main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 8px 12px 12px 12px;
-      box-sizing: border-box;
-      gap: 8px;
-      position: relative;
-    }
+  #sidebar h3 {
+    font-size: 16px;
+    margin: 0 0 6px 0;
+  }
 
+  #sidebar input[type="text"],
+  #sidebar input[type="number"] {
+    width: 100%;
+    padding: 4px;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+
+  #sidebar button {
+    width: 100%;
+    padding: 6px;
+    margin-top: 4px;
+    font-size: 13px;
+  }
+
+  #sidebar .danger {
+    border-color: #b00;
+    color: #b00;
+  }
+
+  .hint {
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #444;
+    border-top: 1px solid #ddd;
+    background: #fafafa;
+  }
+
+  @media print {
+    header, .controls, #sidebar, .hint {
+      display: none !important;
+    }
     #canvasContainer {
-      flex: 1;
-      border: 1px solid #ccc;
-      background: #fff;
-      position: relative;
+      border: none;
     }
-
     #layoutCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-      outline: none;
+      width: 100vw;
+      height: 100vh;
     }
-
-    .hint {
-      font-size: 12px;
-      color: #555;
-    }
-
-    /* Floating editor panel (fixed top-right) */
-    #itemEditor {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: #ffffff;
-      border: 1px solid #999;
-      border-radius: 6px;
-      padding: 8px 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      font-size: 12px;
-      z-index: 9999;
-      display: none;
-    }
-
-    #itemEditor h4 {
-      margin: 0 0 4px 0;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    #itemEditor input[type="text"],
-    #itemEditor input[type="number"] {
-      font-size: 12px;
-      padding: 2px 4px;
-      margin-bottom: 3px;
-      width: 100px;
-    }
-
-    #itemEditor button {
-      font-size: 11px;
-      padding: 2px 6px;
-      margin-right: 4px;
-    }
-
-    @media print {
-      header, .controls, .hint, #itemEditor {
-        display: none !important;
-      }
-      #main {
-        padding: 0;
-      }
-      #canvasContainer {
-        border: none;
-      }
-      #layoutCanvas {
-        width: 100vw;
-        height: 100vh;
-      }
-    }
-  </style>
+  }
+</style>
 </head>
 <body>
+
 <header>Shop Layout Planner</header>
 
-<!-- CONTROLS -->
+<!-- Controls -->
 <div class="controls">
   <div class="control-group">
-    <label for="roomWidth">Room Width:</label>
-    <input type="number" id="roomWidth" value="20" min="1" step="0.1">
-    <label for="roomHeight">Room Height:</label>
-    <input type="number" id="roomHeight" value="30" min="1" step="0.1">
+    <label>Room Width:</label>
+    <input type="number" id="roomWidth" value="20" step="0.1">
+    <label>Height:</label>
+    <input type="number" id="roomHeight" value="30" step="0.1">
     <select id="roomUnits">
       <option value="ft">Feet</option>
       <option value="m">Meters</option>
@@ -164,616 +149,472 @@
   </div>
 
   <div class="control-group">
-    <label for="itemName">Item:</label>
+    <label>Item:</label>
     <input type="text" id="itemName" placeholder="Tablesaw" size="10">
-    <label for="itemWidth">W:</label>
-    <input type="number" id="itemWidth" value="3" min="0.1" step="0.1">
-    <label for="itemDepth">D:</label>
-    <input type="number" id="itemDepth" value="2" min="0.1" step="0.1">
-    <span id="itemUnitsLabel">ft</span>
+    <label>W:</label>
+    <input type="number" id="itemWidth" value="3" step="0.1">
+    <label>D:</label>
+    <input type="number" id="itemDepth" value="2" step="0.1">
     <button id="addItemBtn">Add Item</button>
   </div>
 
   <div class="control-group">
-    <button id="saveBtn">Save (Browser)</button>
-    <button id="loadBtn">Load (Browser)</button>
+    <button id="saveBtn">Save</button>
+    <button id="loadBtn">Load</button>
     <button id="downloadBtn">Download</button>
     <button id="uploadBtn">Upload</button>
-    <button id="printBtn">Print / PDF</button>
+    <button id="printBtn">Print</button>
     <input type="file" id="fileInput" accept="application/json" style="display:none;">
   </div>
 </div>
 
-<!-- MAIN AREA -->
+<!-- Main layout -->
 <div id="main">
+  <!-- Canvas -->
   <div id="canvasContainer">
     <canvas id="layoutCanvas" tabindex="0"></canvas>
   </div>
 
-  <!-- FLOATING EDITOR -->
-  <div id="itemEditor">
-    <h4>Edit Item</h4>
-    <div>
-      <label>Name:</label><br>
-      <input type="text" id="editName">
-    </div>
-    <div>
-      <label>Width:</label><br>
-      <input type="number" id="editWidth" step="0.1" min="0.1">
-    </div>
-    <div>
-      <label>Depth:</label><br>
-      <input type="number" id="editDepth" step="0.1" min="0.1">
-    </div>
-    <div style="margin-top:4px;">
-      <button id="applyEditBtn">Apply</button>
-      <button id="deleteItemBtn" style="border-color:#c00;color:#c00;">Delete</button>
-    </div>
-  </div>
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <h3>Item Details</h3>
 
-  <div class="hint">
-    Click an item to select.  
-    Drag inside the item to move.  
-    Drag the small circle above it to rotate.  
-    Or press [ or ] to rotate with snap.
+    <div id="noSelection"><p>No item selected.</p></div>
+
+    <div id="itemEditor" style="display:none;">
+      <label>Name:</label>
+      <input type="text" id="editName">
+
+      <label>Width:</label>
+      <input type="number" id="editWidth" step="0.1">
+
+      <label>Depth:</label>
+      <input type="number" id="editDepth" step="0.1">
+
+      <label>Rotation (deg):</label>
+      <input type="number" id="editRotation" step="1">
+
+      <button id="applyEditBtn">Apply Changes</button>
+      <button id="deleteItemBtn" class="danger">Delete</button>
+    </div>
   </div>
 </div>
 
+<div class="hint">
+  Click item to select. Drag to move. Drag circle to rotate. Press [ or ] to rotate with snap.
+</div>
+
 <script>
-  /************************************************************
-   * BASIC INITIALIZATION
-   ************************************************************/
-  const canvas = document.getElementById('layoutCanvas');
-  const ctx = canvas.getContext('2d');
-
-  const roomWidthInput = document.getElementById('roomWidth');
-  const roomHeightInput = document.getElementById('roomHeight');
-  const roomUnitsSelect = document.getElementById('roomUnits');
-  const applyRoomBtn = document.getElementById('applyRoomBtn');
-
-  const itemNameInput = document.getElementById('itemName');
-  const itemWidthInput = document.getElementById('itemWidth');
-  const itemDepthInput = document.getElementById('itemDepth');
-  const itemUnitsLabel = document.getElementById('itemUnitsLabel');
-  const addItemBtn = document.getElementById('addItemBtn');
-
-  const saveBtn = document.getElementById('saveBtn');
-  const loadBtn = document.getElementById('loadBtn');
-  const downloadBtn = document.getElementById('downloadBtn');
-  const uploadBtn = document.getElementById('uploadBtn');
-  const fileInput = document.getElementById('fileInput');
-  const printBtn = document.getElementById('printBtn');
-
-  const itemEditor = document.getElementById('itemEditor');
-  const editNameInput = document.getElementById('editName');
-  const editWidthInput = document.getElementById('editWidth');
-  const editDepthInput = document.getElementById('editDepth');
-  const applyEditBtn = document.getElementById('applyEditBtn');
-  const deleteItemBtn = document.getElementById('deleteItemBtn');
-
-  // Room configuration
-  let room = {
-    width: 20,
-    height: 30,
-    units: 'ft'
-  };
-
-  let scale = 10;
-  const padding = 30;
-
-  // Items
-  let items = [];
-  let nextItemId = 1;
-  let selectedItemId = null;
-
-  // Drag & rotate state
-  let isDragging = false;
-  let dragItemId = null;
-  let dragOffset = { x: 0, y: 0 };
-
-  let isRotating = false;
-  let rotateItemId = null;
-  let rotateStartAngle = 0;
-  let rotateStartMouseAngle = 0;
-
-  /************************************************************
-   * CANVAS & DRAWING
-   ************************************************************/
-  function resizeCanvas() {
-    const rect = document.getElementById('canvasContainer').getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    computeScale();
-    draw();
-  }
-
-  function computeScale() {
-    const usableWidth = canvas.width - padding * 2;
-    const usableHeight = canvas.height - padding * 2;
-    scale = Math.min(usableWidth / room.width, usableHeight / room.height);
-  }
-
-  function roomToCanvas(x, y) {
-    return { x: padding + x * scale, y: padding + y * scale };
-  }
-
-  function canvasToRoom(px, py) {
-    return { x: (px - padding) / scale, y: (py - padding) / scale };
-  }
-
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // background
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    drawRoom();
-    drawGrid();
-    drawItems();
-  }
-
-  function drawRoom() {
-    const tl = roomToCanvas(0,0);
-    const br = roomToCanvas(room.width, room.height);
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-  }
-
-  function drawGrid() {
-    const major = 1;
-    const minor = 0.25;
-
-    ctx.save();
-    ctx.lineWidth = 1;
-
-    // Minor grid (every 3 inches if ft)
-    ctx.strokeStyle = "#eee";
-    ctx.beginPath();
-    for (let x = 0; x <= room.width; x += minor) {
-      const p1 = roomToCanvas(x,0);
-      const p2 = roomToCanvas(x,room.height);
-      ctx.moveTo(p1.x,p1.y);
-      ctx.lineTo(p2.x,p2.y);
-    }
-    for (let y = 0; y <= room.height; y += minor) {
-      const p1 = roomToCanvas(0,y);
-      const p2 = roomToCanvas(room.width,y);
-      ctx.moveTo(p1.x,p1.y);
-      ctx.lineTo(p2.x,p2.y);
-    }
-    ctx.stroke();
-
-    // Major grid (every foot)
-    ctx.strokeStyle = "#ccc";
-    ctx.beginPath();
-    for (let x = 0; x <= room.width; x += major) {
-      const p1 = roomToCanvas(x,0);
-      const p2 = roomToCanvas(x,room.height);
-      ctx.moveTo(p1.x,p1.y);
-      ctx.lineTo(p2.x,p2.y);
-    }
-    for (let y = 0; y <= room.height; y += major) {
-      const p1 = roomToCanvas(0,y);
-      const p2 = roomToCanvas(room.width,y);
-      ctx.moveTo(p1.x,p1.y);
-      ctx.lineTo(p2.x,p2.y);
-    }
-    ctx.stroke();
-
-    ctx.restore();
-  }
-
-  function drawItems() {
-    for (let item of items) drawItem(item);
-  }
-
-  function drawItem(item) {
-    const center = roomToCanvas(item.x, item.y);
-    const wPx = item.width * scale;
-    const hPx = item.depth * scale;
-
-    ctx.save();
-    ctx.translate(center.x, center.y);
-    ctx.rotate(item.rotation);
-
-    ctx.fillStyle = "#d5e8ff";
-    ctx.strokeStyle = item.id === selectedItemId ? "#06c" : "#555";
-    ctx.lineWidth = item.id === selectedItemId ? 2 : 1.2;
-
-    ctx.fillRect(-wPx/2, -hPx/2, wPx, hPx);
-    ctx.strokeRect(-wPx/2, -hPx/2, wPx, hPx);
-
-    // label
-    ctx.save();
-    ctx.rotate(-item.rotation);
-    ctx.fillStyle = "#000";
-    ctx.font = "12px system-ui";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(item.name, 0, 0);
-    ctx.restore();
-
-    ctx.restore();
-
-    if (item.id === selectedItemId) drawRotateHandle(item);
-  }
-
-  function drawRotateHandle(item) {
-    const center = roomToCanvas(item.x, item.y);
-    const hPx = item.depth * scale;
-    const halfH = hPx / 2;
-    const handleOffset = 18;
-    const L = halfH + handleOffset;
-
-    const hx = center.x + L * Math.sin(item.rotation);
-    const hy = center.y - L * Math.cos(item.rotation);
-
-    ctx.save();
-    ctx.fillStyle = "#fff";
-    ctx.strokeStyle = "#06c";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(hx, hy, 7, 0, Math.PI*2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(center.x, center.y);
-    ctx.lineTo(hx, hy);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  /************************************************************
-   * HIT TESTING
-   ************************************************************/
-  function getItemAtPoint(px, py) {
-    for (let i = items.length - 1; i >= 0; i--) {
-      const item = items[i];
-
-      if (isOnRotateHandle(px, py, item)) {
-        return { item, mode: "rotate" };
-      }
-
-      if (isInsideItem(px, py, item)) {
-        return { item, mode: "move" };
-      }
-    }
-    return null;
-  }
-
-  function isInsideItem(px, py, item) {
-    const c = roomToCanvas(item.x,item.y);
-    const dx = px - c.x;
-    const dy = py - c.y;
-
-    const cos = Math.cos(-item.rotation);
-    const sin = Math.sin(-item.rotation);
-
-    const x = dx*cos - dy*sin;
-    const y = dx*sin + dy*cos;
-
-    const halfW = item.width*scale/2;
-    const halfH = item.depth*scale/2;
-
-    return (x >= -halfW && x <= halfW && y >= -halfH && y <= halfH);
-  }
-
-  function isOnRotateHandle(px, py, item) {
-    const center = roomToCanvas(item.x,item.y);
-    const hPx = item.depth * scale;
-    const halfH = hPx/2;
-    const offset = 18;
-    const L = halfH + offset;
-
-    const hx = center.x + L*Math.sin(item.rotation);
-    const hy = center.y - L*Math.cos(item.rotation);
-
-    const dx = px - hx;
-    const dy = py - hy;
-    return Math.sqrt(dx*dx + dy*dy) <= 9;
-  }
-
-  /************************************************************
-   * MOUSE CONTROLS
-   ************************************************************/
-  canvas.addEventListener("mousedown", e => {
-    const rect = canvas.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
-
-    const hit = getItemAtPoint(px, py);
-
-    if (hit) {
-      selectedItemId = hit.item.id;
-
-      if (hit.mode === "move") {
-        isDragging = true;
-        dragItemId = hit.item.id;
-        const rp = canvasToRoom(px, py);
-        dragOffset.x = rp.x - hit.item.x;
-        dragOffset.y = rp.y - hit.item.y;
-      }
-
-      if (hit.mode === "rotate") {
-        isRotating = true;
-        rotateItemId = hit.item.id;
-
-        const center = roomToCanvas(hit.item.x, hit.item.y);
-        rotateStartMouseAngle = Math.atan2(py - center.y, px - center.x);
-        rotateStartAngle = hit.item.rotation;
-      }
-
-      draw();
-      showEditor();
-    } else {
-      selectedItemId = null;
-      hideEditor();
-      draw();
-    }
-  });
-
-  canvas.addEventListener("mousemove", e => {
-    const rect = canvas.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
-
-    if (isDragging && dragItemId != null) {
-      const item = items.find(i => i.id === dragItemId);
-      const rp = canvasToRoom(px, py);
-      item.x = rp.x - dragOffset.x;
-      item.y = rp.y - dragOffset.y;
-
-      // Keep inside room
-      item.x = Math.max(item.width/2, Math.min(room.width - item.width/2, item.x));
-      item.y = Math.max(item.depth/2, Math.min(room.height - item.depth/2, item.y));
-
-      draw();
-      showEditor();
-    }
-
-    if (isRotating && rotateItemId != null) {
-      const item = items.find(i => i.id === rotateItemId);
-
-      const center = roomToCanvas(item.x, item.y);
-      const mouseAngle = Math.atan2(py - center.y, px - center.x);
-      item.rotation = rotateStartAngle + (mouseAngle - rotateStartMouseAngle);
-
-      snapRotation(item);
-      draw();
-      showEditor();
-    }
-  });
-
-  window.addEventListener("mouseup", () => {
-    isDragging = false;
-    dragItemId = null;
-
-    isRotating = false;
-    rotateItemId = null;
-  });
-
-  /************************************************************
-   * ROTATION SNAPPING
-   ************************************************************/
-  function snapRotation(item) {
-    const targets = [0, 90, 180, 270].map(a => a*Math.PI/180);
-    let a = item.rotation;
-
-    a = a % (2*Math.PI);
-    if (a < 0) a += 2*Math.PI;
-
-    let closest = a;
-    let minDiff = 999;
-    for (let t of targets) {
-      let diff = Math.abs(a - t);
-      diff = Math.min(diff, 2*Math.PI - diff);
-      if (diff < minDiff) { minDiff = diff; closest = t; }
-    }
-
-    if (minDiff < 5*Math.PI/180) {
-      item.rotation = closest;
-    }
-  }
-
-  /************************************************************
-   * KEYBOARD FOR ROTATION
-   ************************************************************/
-  document.addEventListener("keydown", e => {
-    if (!selectedItemId) return;
-    const item = items.find(i => i.id === selectedItemId);
-
-    const step = 5*Math.PI/180;
-    if (e.key === '[') {
-      item.rotation -= step;
-      snapRotation(item);
-      draw();
-      showEditor();
-    }
-    if (e.key === ']') {
-      item.rotation += step;
-      snapRotation(item);
-      draw();
-      showEditor();
-    }
-  });
-
-  /************************************************************
-   * ADD ITEM
-   ************************************************************/
-  addItemBtn.addEventListener("click", () => {
-    const name = itemNameInput.value.trim() || ("Item " + nextItemId);
-    const w = parseFloat(itemWidthInput.value);
-    const d = parseFloat(itemDepthInput.value);
-
-    if (!(w > 0 && d > 0)) {
-      alert("Enter valid dimensions.");
-      return;
-    }
-
-    const item = {
-      id: nextItemId++,
-      name,
-      width: w,
-      depth: d,
-      x: room.width/2,
-      y: room.height/2,
-      rotation: 0
-    };
-
-    items.push(item);
-    selectedItemId = item.id;
-    draw();
-    showEditor();
-  });
-
-  /************************************************************
-   * EDITOR PANEL
-   ************************************************************/
-  function showEditor() {
-    const item = items.find(i => i.id === selectedItemId);
-    if (!item) {
-      hideEditor();
-      return;
-    }
-
-    editNameInput.value = item.name;
-    editWidthInput.value = item.width;
-    editDepthInput.value = item.depth;
-
-    itemEditor.style.display = "block";
-  }
-
-  function hideEditor() {
-    itemEditor.style.display = "none";
-  }
-
-  applyEditBtn.addEventListener("click", () => {
-    const item = items.find(i => i.id === selectedItemId);
-    if (!item) return;
-
-    const n = editNameInput.value.trim();
-    const w = parseFloat(editWidthInput.value);
-    const d = parseFloat(editDepthInput.value);
-
-    if (!(w > 0 && d > 0)) {
-      alert("Enter valid width/depth.");
-      return;
-    }
-
-    item.name = n || item.name;
-    item.width = w;
-    item.depth = d;
-
-    // keep inside room
-    item.x = Math.max(w/2, Math.min(room.width - w/2, item.x));
-    item.y = Math.max(d/2, Math.min(room.height - d/2, item.y));
-
-    draw();
-  });
-
-  deleteItemBtn.addEventListener("click", () => {
-    items = items.filter(i => i.id !== selectedItemId);
-    selectedItemId = null;
-    draw();
-    hideEditor();
-  });
-
-  /************************************************************
-   * SAVE / LOAD (localStorage)
-   ************************************************************/
-  saveBtn.addEventListener("click", () => {
-    const data = JSON.stringify({ room, items, nextItemId });
-    localStorage.setItem("shopLayout", data);
-    alert("Saved in browser.");
-  });
-
-  loadBtn.addEventListener("click", () => {
-    const data = localStorage.getItem("shopLayout");
-    if (!data) return alert("No layout saved in browser.");
-
-    const obj = JSON.parse(data);
-    room = obj.room;
-    items = obj.items;
-    nextItemId = obj.nextItemId;
-    draw();
-    hideEditor();
-  });
-
-  /************************************************************
-   * DOWNLOAD / UPLOAD FILE
-   ************************************************************/
-  downloadBtn.addEventListener("click", () => {
-    const data = JSON.stringify({ room, items, nextItemId }, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "shop_layout.json";
-    a.click();
-
-    URL.revokeObjectURL(url);
-  });
-
-  uploadBtn.addEventListener("click", () => {
-    fileInput.click();
-  });
-
-  fileInput.addEventListener("change", e => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = evt => {
-      const obj = JSON.parse(evt.target.result);
-      room = obj.room;
-      items = obj.items;
-      nextItemId = obj.nextItemId;
-      draw();
-      hideEditor();
-    };
-    reader.readAsText(file);
-
-    fileInput.value = "";
-  });
-
-  /************************************************************
-   * PRINT
-   ************************************************************/
-  printBtn.addEventListener("click", () => {
-    window.print();
-  });
-
-  /************************************************************
-   * ROOM SETTINGS
-   ************************************************************/
-  applyRoomBtn.addEventListener("click", () => {
-    const w = parseFloat(roomWidthInput.value);
-    const h = parseFloat(roomHeightInput.value);
-
-    if (!(w > 0 && h > 0)) return alert("Enter valid room dimensions.");
-
-    room.width = w;
-    room.height = h;
-    room.units = roomUnitsSelect.value;
-
-    computeScale();
-    draw();
-  });
-
-  roomUnitsSelect.addEventListener("change", () => {
-    itemUnitsLabel.textContent = roomUnitsSelect.value;
-  });
-
-  /************************************************************
-   * INIT
-   ************************************************************/
-  window.addEventListener("resize", resizeCanvas);
-  resizeCanvas();
+/* ===== INITIAL SETUP ===== */
+const canvas = document.getElementById("layoutCanvas");
+const ctx = canvas.getContext("2d");
+
+let room = { width: 20, height: 30, units: "ft" };
+let scale = 10;
+const padding = 30;
+
+let items = [];
+let nextItemId = 1;
+let selectedItemId = null;
+
+let isDragging = false;
+let dragItemId = null;
+let dragOffset = { x:0, y:0 };
+
+let isRotating = false;
+let rotateItemId = null;
+let rotateStartAngle = 0;
+let rotateStartMouseAngle = 0;
+
+/* ===== CANVAS SIZING ===== */
+function resizeCanvas() {
+  const rect = document.getElementById("canvasContainer").getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  computeScale();
   draw();
+}
+
+function computeScale() {
+  const usableW = canvas.width - padding*2;
+  const usableH = canvas.height - padding*2;
+  scale = Math.min(usableW / room.width, usableH / room.height);
+}
+
+function roomToCanvas(x,y){ return {x:padding+x*scale, y:padding+y*scale}; }
+function canvasToRoom(x,y){ return {x:(x-padding)/scale, y:(y-padding)/scale}; }
+
+/* ===== DRAWING ===== */
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawRoom();
+  drawGrid();
+  drawItems();
+}
+
+function drawRoom(){
+  const tl = roomToCanvas(0,0);
+  const br = roomToCanvas(room.width,room.height);
+  ctx.strokeStyle="#000";
+  ctx.lineWidth=2;
+  ctx.strokeRect(tl.x,tl.y,br.x-tl.x,br.y-tl.y);
+}
+
+function drawGrid(){
+  const major=1, minor=0.25;
+  ctx.save();
+
+  ctx.strokeStyle="#eee";
+  ctx.beginPath();
+  for(let x=0; x<=room.width; x+=minor){
+    const p1=roomToCanvas(x,0), p2=roomToCanvas(x,room.height);
+    ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+  }
+  for(let y=0; y<=room.height; y+=minor){
+    const p1=roomToCanvas(0,y), p2=roomToCanvas(room.width,y);
+    ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle="#ccc";
+  ctx.beginPath();
+  for(let x=0; x<=room.width; x+=major){
+    const p1=roomToCanvas(x,0), p2=roomToCanvas(x,room.height);
+    ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+  }
+  for(let y=0; y<=room.height; y+=major){
+    const p1=roomToCanvas(0,y), p2=roomToCanvas(room.width,y);
+    ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+  }
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawItems(){
+  items.forEach(drawItem);
+}
+
+function drawItem(item){
+  const c = roomToCanvas(item.x,item.y);
+  const w = item.width*scale;
+  const h = item.depth*scale;
+
+  ctx.save();
+  ctx.translate(c.x,c.y);
+  ctx.rotate(item.rotation);
+
+  ctx.fillStyle="#d5e8ff";
+  ctx.strokeStyle = (item.id===selectedItemId ? "#06c" : "#555");
+  ctx.lineWidth = (item.id===selectedItemId ? 2 : 1.2);
+
+  ctx.fillRect(-w/2,-h/2,w,h);
+  ctx.strokeRect(-w/2,-h/2,w,h);
+
+  ctx.save();
+  ctx.rotate(-item.rotation);
+  ctx.fillStyle="#000";
+  ctx.font="13px system-ui";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  ctx.fillText(item.name,0,0);
+  ctx.restore();
+
+  ctx.restore();
+
+  if(item.id===selectedItemId) drawRotateHandle(item);
+}
+
+function drawRotateHandle(item){
+  const c=roomToCanvas(item.x,item.y);
+  const h=item.depth*scale;
+  const half=h/2, offset=20;
+  const L=half+offset;
+
+  const hx=c.x + L*Math.sin(item.rotation);
+  const hy=c.y - L*Math.cos(item.rotation);
+
+  ctx.save();
+  ctx.fillStyle="#fff";
+  ctx.strokeStyle="#06c";
+  ctx.lineWidth=2;
+
+  ctx.beginPath();
+  ctx.arc(hx,hy,7,0,Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(c.x,c.y);
+  ctx.lineTo(hx,hy);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/* ===== HIT TEST ===== */
+function getHit(px,py){
+  for(let i=items.length-1;i>=0;i--){
+    const item=items[i];
+    if(isRotateHandle(px,py,item)) return {item,mode:"rotate"};
+    if(isInsideItem(px,py,item)) return {item,mode:"move"};
+  }
+  return null;
+}
+
+function isInsideItem(px,py,item){
+  const c = roomToCanvas(item.x,item.y);
+  let dx=px-c.x, dy=py-c.y;
+  const cos=Math.cos(-item.rotation), sin=Math.sin(-item.rotation);
+  let x=dx*cos - dy*sin;
+  let y=dx*sin + dy*cos;
+
+  const hw=item.width*scale/2, hh=item.depth*scale/2;
+  return (x>=-hw && x<=hw && y>=-hh && y<=hh);
+}
+
+function isRotateHandle(px,py,item){
+  const c = roomToCanvas(item.x,item.y);
+  const h=item.depth*scale;
+  const half=h/2, offset=20;
+  const L=half+offset;
+
+  const hx=c.x + L*Math.sin(item.rotation);
+  const hy=c.y - L*Math.cos(item.rotation);
+
+  return Math.hypot(px-hx,py-hy)<=10;
+}
+
+/* ===== MOUSE EVENTS ===== */
+canvas.addEventListener("mousedown", e=>{
+  const rect=canvas.getBoundingClientRect();
+  const px=e.clientX-rect.left, py=e.clientY-rect.top;
+
+  const hit=getHit(px,py);
+
+  if(hit){
+    selectedItemId=hit.item.id;
+    updateSidebar();
+
+    if(hit.mode==="move"){
+      isDragging=true; dragItemId=hit.item.id;
+      const rp=canvasToRoom(px,py);
+      dragOffset.x=rp.x-hit.item.x;
+      dragOffset.y=rp.y-hit.item.y;
+    }
+
+    if(hit.mode==="rotate"){
+      isRotating=true; rotateItemId=hit.item.id;
+      const c=roomToCanvas(hit.item.x,hit.item.y);
+      rotateStartMouseAngle=Math.atan2(py-c.y, px-c.x);
+      rotateStartAngle=hit.item.rotation;
+    }
+
+    draw();
+  } else {
+    selectedItemId=null;
+    updateSidebar();
+    draw();
+  }
+});
+
+canvas.addEventListener("mousemove", e=>{
+  const rect=canvas.getBoundingClientRect();
+  const px=e.clientX-rect.left, py=e.clientY-rect.top;
+
+  if(isDragging && dragItemId){
+    const item=items.find(i=>i.id===dragItemId);
+    const rp=canvasToRoom(px,py);
+    item.x=rp.x-dragOffset.x;
+    item.y=rp.y-dragOffset.y;
+
+    item.x=Math.max(item.width/2, Math.min(room.width-item.width/2, item.x));
+    item.y=Math.max(item.depth/2, Math.min(room.height-item.depth/2, item.y));
+
+    draw();
+    updateSidebar();
+  }
+
+  if(isRotating && rotateItemId){
+    const item=items.find(i=>i.id===rotateItemId);
+    const c=roomToCanvas(item.x,item.y);
+
+    const ang=Math.atan2(py-c.y, px-c.x);
+    item.rotation=rotateStartAngle + (ang-rotateStartMouseAngle);
+    snapRotation(item);
+
+    draw();
+    updateSidebar();
+  }
+});
+
+window.addEventListener("mouseup", ()=>{
+  isDragging=false;
+  dragItemId=null;
+  isRotating=false;
+  rotateItemId=null;
+});
+
+/* ===== SNAP ROTATION ===== */
+function snapRotation(item){
+  const targets=[0,90,180,270].map(d=>d*Math.PI/180);
+  let a=item.rotation%(2*Math.PI);
+  if(a<0)a+=2*Math.PI;
+
+  let best=a, min=999;
+  for(let t of targets){
+    let diff=Math.abs(a-t);
+    diff=Math.min(diff,2*Math.PI-diff);
+    if(diff<min){min=diff; best=t;}
+  }
+
+  if(min < 5*Math.PI/180) item.rotation=best;
+}
+
+/* ===== KEYBOARD ROTATION ===== */
+document.addEventListener("keydown", e=>{
+  if(!selectedItemId)return;
+  const item=items.find(i=>i.id===selectedItemId);
+  const step=5*Math.PI/180;
+
+  if(e.key==="[") item.rotation -= step;
+  if(e.key==="]") item.rotation += step;
+
+  snapRotation(item);
+  draw();
+  updateSidebar();
+});
+
+/* ===== ADD ITEM ===== */
+document.getElementById("addItemBtn").addEventListener("click", ()=>{
+  const name=document.getElementById("itemName").value || ("Item "+nextItemId);
+  const w=parseFloat(document.getElementById("itemWidth").value);
+  const d=parseFloat(document.getElementById("itemDepth").value);
+  if(!(w>0 && d>0)) return alert("Invalid size.");
+
+  const item={ id:nextItemId++, name, width:w, depth:d, x:room.width/2, y:room.height/2, rotation:0 };
+  items.push(item);
+  selectedItemId=item.id;
+
+  draw(); updateSidebar();
+});
+
+/* ===== SIDEBAR ===== */
+function updateSidebar(){
+  const noSel=document.getElementById("noSelection");
+  const editor=document.getElementById("itemEditor");
+
+  if(!selectedItemId){
+    noSel.style.display="block";
+    editor.style.display="none";
+    return;
+  }
+
+  const item=items.find(i=>i.id===selectedItemId);
+
+  noSel.style.display="none";
+  editor.style.display="block";
+
+  document.getElementById("editName").value=item.name;
+  document.getElementById("editWidth").value=item.width;
+  document.getElementById("editDepth").value=item.depth;
+  document.getElementById("editRotation").value=(item.rotation*180/Math.PI).toFixed(1);
+}
+
+document.getElementById("applyEditBtn").addEventListener("click", ()=>{
+  const item=items.find(i=>i.id===selectedItemId);
+  if(!item)return;
+
+  item.name=document.getElementById("editName").value;
+
+  const w=parseFloat(document.getElementById("editWidth").value);
+  const d=parseFloat(document.getElementById("editDepth").value);
+  const r=parseFloat(document.getElementById("editRotation").value);
+
+  if(w>0 && d>0){
+    item.width=w; 
+    item.depth=d;
+  }
+
+  if(!isNaN(r)){
+    item.rotation=r*Math.PI/180;
+    snapRotation(item);
+  }
+
+  item.x=Math.max(w/2, Math.min(room.width-w/2, item.x));
+  item.y=Math.max(d/2, Math.min(room.height-d/2, item.y));
+
+  draw(); 
+  updateSidebar();
+});
+
+document.getElementById("deleteItemBtn").addEventListener("click", ()=>{
+  items=items.filter(i=>i.id!==selectedItemId);
+  selectedItemId=null;
+  draw(); updateSidebar();
+});
+
+/* ===== ROOM APPLY ===== */
+document.getElementById("applyRoomBtn").addEventListener("click", ()=>{
+  const w=parseFloat(document.getElementById("roomWidth").value);
+  const h=parseFloat(document.getElementById("roomHeight").value);
+  if(!(w>0 && h>0)) return alert("Invalid room dimensions.");
+
+  room.width=w;
+  room.height=h;
+  room.units=document.getElementById("roomUnits").value;
+
+  computeScale();
+  draw();
+});
+
+/* ===== SAVE / LOAD LOCAL ===== */
+document.getElementById("saveBtn").addEventListener("click", ()=>{
+  localStorage.setItem("shopLayout", JSON.stringify({room,items,nextItemId}));
+  alert("Saved to browser.");
+});
+
+document.getElementById("loadBtn").addEventListener("click", ()=>{
+  const d=localStorage.getItem("shopLayout");
+  if(!d) return alert("No saved layout.");
+  const obj=JSON.parse(d);
+  room=obj.room; items=obj.items; nextItemId=obj.nextItemId;
+  draw(); updateSidebar();
+});
+
+/* ===== DOWNLOAD / UPLOAD ===== */
+document.getElementById("downloadBtn").addEventListener("click", ()=>{
+  const blob=new Blob([JSON.stringify({room,items,nextItemId},null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download="shop_layout.json"; a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("uploadBtn").addEventListener("click", ()=>fileInput.click());
+
+document.getElementById("fileInput").addEventListener("change", e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+
+  const reader=new FileReader();
+  reader.onload=function(evt){
+    const obj=JSON.parse(evt.target.result);
+    room=obj.room; items=obj.items; nextItemId=obj.nextItemId;
+    draw(); updateSidebar();
+  };
+  reader.readAsText(file);
+
+  fileInput.value="";
+});
+
+/* ===== PRINT ===== */
+document.getElementById("printBtn").addEventListener("click", ()=>window.print());
+
+/* ===== INIT ===== */
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+draw();
 </script>
 
 </body>
