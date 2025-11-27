@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Simple Shop Layout Planner</title>
+  <title>Shop Layout Planner</title>
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -72,6 +72,7 @@
       padding: 8px 12px 12px 12px;
       box-sizing: border-box;
       gap: 8px;
+      position: relative;
     }
 
     #canvasContainer {
@@ -93,6 +94,38 @@
       color: #555;
     }
 
+    #itemEditor {
+      position: absolute;
+      background: #ffffff;
+      border: 1px solid #999;
+      border-radius: 6px;
+      padding: 6px 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      font-size: 12px;
+      z-index: 10;
+      display: none;
+    }
+
+    #itemEditor h4 {
+      margin: 0 0 4px 0;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    #itemEditor input[type="text"],
+    #itemEditor input[type="number"] {
+      font-size: 12px;
+      padding: 2px 4px;
+      margin-bottom: 3px;
+      width: 90px;
+    }
+
+    #itemEditor button {
+      font-size: 11px;
+      padding: 2px 6px;
+      margin-right: 4px;
+    }
+
     @media print {
       body {
         margin: 0;
@@ -100,7 +133,7 @@
         background: #fff;
       }
 
-      header, .controls, .hint {
+      header, .controls, .hint, #itemEditor {
         display: none !important;
       }
 
@@ -147,9 +180,12 @@
   </div>
 
   <div class="control-group">
-    <button id="saveBtn">Save Layout</button>
-    <button id="loadBtn">Load Layout</button>
+    <button id="saveBtn">Save Layout (Browser)</button>
+    <button id="loadBtn">Load Layout (Browser)</button>
+    <button id="downloadBtn">Download Layout</button>
+    <button id="uploadBtn">Upload Layout</button>
     <button id="printBtn">Print / PDF</button>
+    <input type="file" id="fileInput" accept="application/json" style="display:none;">
   </div>
 </div>
 
@@ -157,11 +193,32 @@
   <div id="canvasContainer">
     <canvas id="layoutCanvas" tabindex="0"></canvas>
   </div>
+
+  <div id="itemEditor">
+    <h4>Edit Item</h4>
+    <div>
+      <label>Name:</label><br>
+      <input type="text" id="editName">
+    </div>
+    <div>
+      <label>Width:</label><br>
+      <input type="number" id="editWidth" step="0.1" min="0.1">
+    </div>
+    <div>
+      <label>Depth:</label><br>
+      <input type="number" id="editDepth" step="0.1" min="0.1">
+    </div>
+    <div style="margin-top:4px;">
+      <button id="applyEditBtn">Apply</button>
+      <button id="deleteItemBtn" style="border-color:#b00;color:#b00;">Delete</button>
+    </div>
+  </div>
+
   <div class="hint">
     <strong>Controls:</strong>
-    Click item to select. Drag with mouse to move.
-    Use <code>[</code> / <code>]</code> to rotate selected item.
-    Rotation snaps to 0°, 90°, 180°, 270° when close.
+    Click an item to select. Drag inside the item to move it.
+    Drag the small circle above a selected item to rotate.
+    Use <code>[</code> / <code>]</code> to rotate with the keyboard (snaps near 0°, 90°, 180°, 270°).
   </div>
 </div>
 
@@ -182,7 +239,17 @@
 
   const saveBtn = document.getElementById('saveBtn');
   const loadBtn = document.getElementById('loadBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const fileInput = document.getElementById('fileInput');
   const printBtn = document.getElementById('printBtn');
+
+  const itemEditor = document.getElementById('itemEditor');
+  const editNameInput = document.getElementById('editName');
+  const editWidthInput = document.getElementById('editWidth');
+  const editDepthInput = document.getElementById('editDepth');
+  const applyEditBtn = document.getElementById('applyEditBtn');
+  const deleteItemBtn = document.getElementById('deleteItemBtn');
 
   // Room & scale
   let room = {
@@ -199,10 +266,15 @@
   let nextItemId = 1;
   let selectedItemId = null;
 
-  // Drag state
+  // Interaction state
   let isDragging = false;
-  let dragOffset = { x: 0, y: 0 }; // in room units
   let dragItemId = null;
+  let dragOffset = { x: 0, y: 0 }; // in room units
+
+  let isRotating = false;
+  let rotateItemId = null;
+  let rotateStartAngle = 0; // radians
+  let rotateStartMouseAngle = 0; // radians
 
   // Resize canvas to container
   function resizeCanvas() {
@@ -256,11 +328,12 @@
 
     drawGrid();
     drawItems();
+    updateItemEditorPosition();
   }
 
   function drawGrid() {
-    const majorSpacing = 1;    // 1 foot
-    const minorSpacing = 0.25; // 3 inches (0.25 ft)
+    const majorSpacing = 1;    // 1 foot (or 1 unit)
+    const minorSpacing = 0.25; // 0.25 unit (3 inches if ft)
 
     ctx.save();
     ctx.lineWidth = 1;
@@ -313,6 +386,8 @@
     const center = roomToCanvas(item.x, item.y);
     const wPx = item.width * scale;
     const hPx = item.depth * scale;
+    const handleOffset = 15;
+    const handleRadius = 7;
 
     ctx.save();
     ctx.translate(center.x, center.y);
@@ -327,17 +402,42 @@
     ctx.fill();
     ctx.stroke();
 
-    // Label
+    // Label (keep upright)
     ctx.fillStyle = '#000';
     ctx.font = '12px system-ui';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.save();
-    ctx.rotate(-item.rotation); // keep label readable upright
+    ctx.rotate(-item.rotation);
     ctx.fillText(item.name, 0, 0);
     ctx.restore();
 
     ctx.restore();
+
+    // Rotation handle (draw in canvas space)
+    if (item.id === selectedItemId) {
+      const halfH = hPx / 2;
+      const L = halfH + handleOffset;
+      // local direction (0, -L) rotated by item.rotation:
+      const hx = center.x + L * Math.sin(item.rotation);
+      const hy = center.y - L * Math.cos(item.rotation);
+
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#0066cc';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(hx, hy, handleRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // small arrow-ish line from center to handle
+      ctx.beginPath();
+      ctx.moveTo(center.x, center.y);
+      ctx.lineTo(hx, hy);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   function addItem() {
@@ -364,10 +464,15 @@
   }
 
   function getItemAtCanvasPoint(px, py) {
-    // Check items from topmost to bottom
+    // check from topmost down
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
-      if (isPointInItem(px, py, item)) return item;
+      if (isPointOnRotateHandle(px, py, item)) {
+        return { item, mode: 'rotate' };
+      }
+      if (isPointInItem(px, py, item)) {
+        return { item, mode: 'move' };
+      }
     }
     return null;
   }
@@ -389,23 +494,60 @@
     return (lx >= -halfW && lx <= halfW && ly >= -halfH && ly <= halfH);
   }
 
-  // Mouse events for dragging
+  function isPointOnRotateHandle(px, py, item) {
+    const center = roomToCanvas(item.x, item.y);
+    const wPx = item.width * scale;
+    const hPx = item.depth * scale;
+    const halfH = hPx / 2;
+    const handleOffset = 15;
+    const handleRadius = 9;
+
+    const L = halfH + handleOffset;
+    const hx = center.x + L * Math.sin(item.rotation);
+    const hy = center.y - L * Math.cos(item.rotation);
+
+    const dx = px - hx;
+    const dy = py - hy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    return dist <= handleRadius;
+  }
+
+  // Mouse events
   canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
 
-    const item = getItemAtCanvasPoint(px, py);
-    if (item) {
-      selectedItemId = item.id;
-      const roomPt = canvasToRoom(px, py);
-      dragOffset.x = roomPt.x - item.x;
-      dragOffset.y = roomPt.y - item.y;
-      dragItemId = item.id;
-      isDragging = true;
+    const hit = getItemAtCanvasPoint(px, py);
+    if (hit && hit.item) {
+      selectedItemId = hit.item.id;
+      const item = hit.item;
+
+      if (hit.mode === 'move') {
+        const roomPt = canvasToRoom(px, py);
+        dragOffset.x = roomPt.x - item.x;
+        dragOffset.y = roomPt.y - item.y;
+        dragItemId = item.id;
+        isDragging = true;
+        isRotating = false;
+        rotateItemId = null;
+      } else if (hit.mode === 'rotate') {
+        const center = roomToCanvas(item.x, item.y);
+        rotateItemId = item.id;
+        isRotating = true;
+        isDragging = false;
+        dragItemId = null;
+
+        rotateStartAngle = item.rotation;
+        rotateStartMouseAngle = Math.atan2(py - center.y, px - center.x);
+      }
       draw();
     } else {
       selectedItemId = null;
+      isDragging = false;
+      dragItemId = null;
+      isRotating = false;
+      rotateItemId = null;
       draw();
     }
 
@@ -413,31 +555,44 @@
   });
 
   canvas.addEventListener('mousemove', (e) => {
-    if (!isDragging || dragItemId == null) return;
-    const item = items.find(it => it.id === dragItemId);
-    if (!item) return;
-
     const rect = canvas.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
-    const roomPt = canvasToRoom(px, py);
 
-    item.x = roomPt.x - dragOffset.x;
-    item.y = roomPt.y - dragOffset.y;
+    if (isDragging && dragItemId != null) {
+      const item = items.find(it => it.id === dragItemId);
+      if (!item) return;
 
-    // Keep inside room bounds (roughly)
-    item.x = Math.max(item.width / 2, Math.min(room.width - item.width / 2, item.x));
-    item.y = Math.max(item.depth / 2, Math.min(room.height - item.depth / 2, item.y));
+      const roomPt = canvasToRoom(px, py);
+      item.x = roomPt.x - dragOffset.x;
+      item.y = roomPt.y - dragOffset.y;
 
-    draw();
+      // keep roughly inside room
+      item.x = Math.max(item.width / 2, Math.min(room.width - item.width / 2, item.x));
+      item.y = Math.max(item.depth / 2, Math.min(room.height - item.depth / 2, item.y));
+
+      draw();
+    } else if (isRotating && rotateItemId != null) {
+      const item = items.find(it => it.id === rotateItemId);
+      if (!item) return;
+
+      const center = roomToCanvas(item.x, item.y);
+      const currentMouseAngle = Math.atan2(py - center.y, px - center.x);
+      let delta = currentMouseAngle - rotateStartMouseAngle;
+      item.rotation = rotateStartAngle + delta;
+      snapRotation(item);
+      draw();
+    }
   });
 
   window.addEventListener('mouseup', () => {
     isDragging = false;
     dragItemId = null;
+    isRotating = false;
+    rotateItemId = null;
   });
 
-  // Keyboard for rotation
+  // Keyboard rotation
   document.addEventListener('keydown', (e) => {
     if (!selectedItemId) return;
     const item = items.find(it => it.id === selectedItemId);
@@ -464,7 +619,7 @@
     const snapAngles = [0, 90, 180, 270].map(a => a * Math.PI / 180);
     let angle = item.rotation;
 
-    // Normalize angle to [0, 2π)
+    // normalize [0, 2π)
     angle = angle % (2 * Math.PI);
     if (angle < 0) angle += 2 * Math.PI;
 
@@ -505,14 +660,78 @@
   });
 
   roomUnitsSelect.addEventListener('change', () => {
-    // Just update label; values are assumed in the chosen units
     itemUnitsLabel.textContent = (roomUnitsSelect.value === 'ft' ? 'ft' : roomUnitsSelect.value);
   });
 
   addItemBtn.addEventListener('click', addItem);
 
-  // Save / Load
-  function saveLayout() {
+  // Floating editor
+  function updateItemEditorPosition() {
+    const item = items.find(it => it.id === selectedItemId);
+    if (!item) {
+      itemEditor.style.display = 'none';
+      return;
+    }
+
+    // set values
+    editNameInput.value = item.name;
+    editWidthInput.value = item.width.toFixed(2).replace(/\.00$/, '');
+    editDepthInput.value = item.depth.toFixed(2).replace(/\.00$/, '');
+
+    // position near item center
+    const center = roomToCanvas(item.x, item.y);
+    let left = center.x + 14;
+    let top = center.y + 14;
+
+    // keep inside main container bounds a bit
+    const mainRect = document.getElementById('main').getBoundingClientRect();
+    const editorRect = itemEditor.getBoundingClientRect();
+
+    if (left + editorRect.width > mainRect.width - 10) {
+      left = center.x - editorRect.width - 14;
+    }
+    if (top + editorRect.height > mainRect.height - 10) {
+      top = center.y - editorRect.height - 14;
+    }
+
+    itemEditor.style.left = left + 'px';
+    itemEditor.style.top = top + 'px';
+    itemEditor.style.display = 'block';
+  }
+
+  applyEditBtn.addEventListener('click', () => {
+    const item = items.find(it => it.id === selectedItemId);
+    if (!item) return;
+
+    const newName = editNameInput.value.trim() || item.name;
+    const newW = parseFloat(editWidthInput.value);
+    const newD = parseFloat(editDepthInput.value);
+
+    if (!(newW > 0) || !(newD > 0)) {
+      alert('Please enter valid width and depth.');
+      return;
+    }
+
+    item.name = newName;
+    item.width = newW;
+    item.depth = newD;
+
+    // keep inside room
+    item.x = Math.max(item.width / 2, Math.min(room.width - item.width / 2, item.x));
+    item.y = Math.max(item.depth / 2, Math.min(room.height - item.depth / 2, item.y));
+
+    draw();
+  });
+
+  deleteItemBtn.addEventListener('click', () => {
+    if (!selectedItemId) return;
+    items = items.filter(it => it.id !== selectedItemId);
+    selectedItemId = null;
+    draw();
+  });
+
+  // Save / Load (browser localStorage)
+  function saveLayoutLocal() {
     const data = {
       version: 1,
       room,
@@ -521,41 +740,94 @@
     };
     try {
       localStorage.setItem('shopLayout', JSON.stringify(data));
-      alert('Layout saved.');
+      alert('Layout saved in this browser.');
     } catch (err) {
       console.error(err);
       alert('Unable to save layout (localStorage error).');
     }
   }
 
-  function loadLayout() {
+  function loadLayoutLocal() {
     const raw = localStorage.getItem('shopLayout');
     if (!raw) {
-      alert('No saved layout found.');
+      alert('No saved layout found in this browser.');
       return;
     }
     try {
       const data = JSON.parse(raw);
-      room = data.room || room;
-      items = data.items || [];
-      nextItemId = data.nextItemId || (items.reduce((m, it) => Math.max(m, it.id), 0) + 1);
-
-      roomWidthInput.value = room.width;
-      roomHeightInput.value = room.height;
-      roomUnitsSelect.value = room.units || 'ft';
-      itemUnitsLabel.textContent = (room.units === 'ft' ? 'ft' : room.units);
-
-      computeScale();
-      draw();
+      restoreLayoutFromData(data);
     } catch (err) {
       console.error(err);
       alert('Error loading layout.');
     }
   }
 
-  saveBtn.addEventListener('click', saveLayout);
-  loadBtn.addEventListener('click', loadLayout);
+  function restoreLayoutFromData(data) {
+    room = data.room || room;
+    items = data.items || [];
+    nextItemId = data.nextItemId || (items.reduce((m, it) => Math.max(m, it.id), 0) + 1);
 
+    roomWidthInput.value = room.width;
+    roomHeightInput.value = room.height;
+    roomUnitsSelect.value = room.units || 'ft';
+    itemUnitsLabel.textContent = (room.units === 'ft' ? 'ft' : room.units);
+
+    computeScale();
+    selectedItemId = null;
+    draw();
+  }
+
+  saveBtn.addEventListener('click', saveLayoutLocal);
+  loadBtn.addEventListener('click', loadLayoutLocal);
+
+  // Download / Upload
+  function downloadLayoutFile() {
+    const data = {
+      version: 1,
+      room,
+      items,
+      nextItemId
+    };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `shop_layout_${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function uploadLayoutFile() {
+    fileInput.click();
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = JSON.parse(evt.target.result);
+        restoreLayoutFromData(data);
+      } catch (err) {
+        console.error(err);
+        alert('Error reading layout file.');
+      }
+    };
+    reader.readAsText(file);
+    // reset input so you can upload same file again if needed
+    fileInput.value = '';
+  });
+
+  downloadBtn.addEventListener('click', downloadLayoutFile);
+  uploadBtn.addEventListener('click', uploadLayoutFile);
+
+  // Print
   printBtn.addEventListener('click', () => {
     window.print();
   });
