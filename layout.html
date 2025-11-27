@@ -124,8 +124,8 @@
       border: none;
     }
     #layoutCanvas {
-      width: 100vw;
-      height: 100vh;
+      width: auto !important;
+      height: auto !important;
     }
   }
 </style>
@@ -166,6 +166,12 @@
     <button id="printBtn">Print</button>
     <input type="file" id="fileInput" accept="application/json" style="display:none;">
   </div>
+
+  <div class="control-group">
+    <label>PDF Header:</label>
+    <input type="text" id="pdfHeader" value="Shop Layout">
+    <button id="pdfBtn">Save PDF</button>
+  </div>
 </div>
 
 <!-- Main layout -->
@@ -203,6 +209,9 @@
 <div class="hint">
   Click item to select. Drag to move. Drag circle to rotate. Press [ or ] to rotate with snap.
 </div>
+
+<!-- jsPDF CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
 /* ===== INITIAL SETUP ===== */
@@ -525,10 +534,8 @@ document.getElementById("applyEditBtn").addEventListener("click", ()=>{
   const item=items.find(i=>i.id===selectedItemId);
   if(!item)return;
 
-  // Name
   item.name=document.getElementById("editName").value;
 
-  // Width & depth with safe fallbacks
   let w=parseFloat(document.getElementById("editWidth").value);
   let d=parseFloat(document.getElementById("editDepth").value);
   if(!(w>0)) w=item.width;
@@ -537,14 +544,12 @@ document.getElementById("applyEditBtn").addEventListener("click", ()=>{
   item.width=w;
   item.depth=d;
 
-  // Rotation in degrees
   let rDeg=parseFloat(document.getElementById("editRotation").value);
   if(!isNaN(rDeg)){
     item.rotation=rDeg*Math.PI/180;
     snapRotation(item);
   }
 
-  // Clamp using updated size
   item.x=Math.max(item.width/2, Math.min(room.width-item.width/2, item.x));
   item.y=Math.max(item.depth/2, Math.min(room.height-item.depth/2, item.y));
 
@@ -614,6 +619,51 @@ document.getElementById("fileInput").addEventListener("change", e=>{
 
 /* ===== PRINT ===== */
 document.getElementById("printBtn").addEventListener("click", ()=>window.print());
+
+/* ===== SAVE PDF (EXACT CANVAS SIZE + HEADER) ===== */
+document.getElementById("pdfBtn").addEventListener("click", ()=>{
+  const { jsPDF } = window.jspdf;
+  const headerText = document.getElementById("pdfHeader").value || "Shop Layout";
+
+  // Use current canvas bitmap
+  const dataUrl = canvas.toDataURL("image/png");
+
+  const canvasWidth = canvas.width;
+  const canvasHeight = canvas.height;
+
+  // Auto orientation
+  const orientation = canvasWidth >= canvasHeight ? "landscape" : "portrait";
+
+  // Header space in points
+  const headerSpace = 40;
+  const pageWidth = canvasWidth;
+  const pageHeight = canvasHeight + headerSpace;
+
+  const pdf = new jsPDF({
+    orientation,
+    unit: "pt",
+    format: [pageWidth, pageHeight]
+  });
+
+  // Header
+  pdf.setFontSize(14);
+  const textWidth = pdf.getTextWidth(headerText);
+  const textX = (pageWidth - textWidth) / 2;
+  const textY = 20;
+  pdf.text(headerText, textX, textY);
+
+  // Image (layout) below header
+  pdf.addImage(
+    dataUrl,
+    "PNG",
+    0,
+    headerSpace,
+    canvasWidth,
+    canvasHeight
+  );
+
+  pdf.save("shop_layout.pdf");
+});
 
 /* ===== INIT ===== */
 window.addEventListener("resize", resizeCanvas);
