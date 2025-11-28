@@ -210,6 +210,7 @@
       <button id="toolSelectBtn" class="active">Select / Items</button>
       <button id="toolWallBtn">Add Wall</button>
       <button id="toolLabelBtn">Add Label</button>
+      <!-- Door tool will be added in a later revision -->
     </div>
     <div class="row-right">
       <label>Wall Type:</label>
@@ -303,7 +304,7 @@
 <div class="hint">
   Rectangles: left-click to select, drag to move, drag small circle to rotate, [ and ] to rotate with snap.  
   Circles: left-click to select, drag to move.  
-  Walls: choose "Add Wall", click start (snaps to grid), click end (snaps). One wall per click of the tool. Click wall or its endpoints to edit and drag.  
+  Walls: choose "Add Wall", click start (snaps), move mouse to see preview, click end (snaps). One wall per click of the tool. Click wall or its endpoints to edit and drag.  
   Labels: choose "Add Label" and click to place text. Click a label to edit text, size, color, and drag to move.  
   Right-click and drag to pan. Mouse wheel to zoom.
 </div>
@@ -322,7 +323,7 @@ const padding = 30;
 
 let items = [];   // {id, type: "rect"|"circle", name, width, depth, diameter, x, y, rotation, color}
 let walls = [];   // {id, x1,y1,x2,y2, style: "interior"|"exterior"}
-let labels = [];  // {id, text, x, y, size: "small|medium|large", color}
+let labels = [];  // {id, text, x, y, size, color}
 let nextItemId = 1;
 let nextWallId = 1;
 let nextLabelId = 1;
@@ -360,7 +361,10 @@ let panLastY = 0;
 
 // Tool mode
 let toolMode = "select"; // "select" | "wall" | "label"
-let wallDraftStart = null; // first click point in room coords for wall
+let wallDraftStart = null; // first click point (world coords) for wall
+
+// For wall preview
+let wallPreviewCurrent = null; // { x, y } world coords when wallDraftStart is set
 
 function markDirty() {
   isDirty = true;
@@ -386,9 +390,22 @@ function getMinorGridStep() {
 function getMajorGridStep() {
   return room.units === "m" ? 0.5 : 1.0;
 }
-function snapToGrid(v) {
+function snapToGridValue(v) {
   const step = getMinorGridStep();
   return Math.round(v / step) * step;
+}
+
+/**
+ * Snap a point in world coords with awareness of pixel position.
+ * For now, we snap to the grid only, but this is the place where
+ * endpoint/intersection snapping can be layered in later.
+ */
+function getSnappedPoint(world, px, py, mode) {
+  // mode could later be "wall" | "door" | "generic"
+  return {
+    x: snapToGridValue(world.x),
+    y: snapToGridValue(world.y)
+  };
 }
 
 /* ===== CANVAS SIZING ===== */
@@ -397,10 +414,7 @@ function resizeCanvas() {
   canvas.width = rect.width;
   canvas.height = rect.height;
   computeBaseScale();
-  // Reset zoom/pan on resize so it doesn't get weird
-  viewScale = 1;
-  offsetX = 0;
-  offsetY = 0;
+  // Do not reset zoom/pan here; user may want to keep view
   draw();
 }
 
@@ -430,7 +444,7 @@ function canvasToRoom(x,y){
   };
 }
 
-/* ===== BOUNDS & CLAMPING (handles rotation) ===== */
+/* ===== BOUNDS (not clamping anymore) ===== */
 function getItemBounds(item) {
   if (item.type === "circle") {
     const r = item.diameter / 2;
@@ -445,12 +459,6 @@ function getItemBounds(item) {
     const halfH = 0.5 * (Math.abs(w * sin) + Math.abs(d * cos));
     return { halfW, halfH };
   }
-}
-
-function clampItemInsideRoom(item) {
-  const b = getItemBounds(item);
-  item.x = Math.max(b.halfW, Math.min(room.width - b.halfW, item.x));
-  item.y = Math.max(b.halfH, Math.min(room.height - b.halfH, item.y));
 }
 
 /* ===== ITEM COLORS ===== */
@@ -487,58 +495,60 @@ function getLabelFont(label) {
 /* ===== DRAWING ===== */
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  drawRoom();
-  drawGrid();
-  drawWalls();
-  drawItems();
-  drawLabels();
+  drawRoom(ctx, roomToCanvas, effectiveScale());
+  drawGrid(ctx, roomToCanvas);
+  drawWalls(ctx, roomToCanvas);
+  drawItems(ctx, roomToCanvas);
+  drawLabels(ctx, roomToCanvas);
+  drawDimensions(ctx, roomToCanvas);
+  drawWallPreview(ctx, roomToCanvas);
 }
 
-function drawRoom(){
-  const tl = roomToCanvas(0,0);
-  const br = roomToCanvas(room.width,room.height);
-  ctx.strokeStyle="#000";
-  ctx.lineWidth=2;
-  ctx.strokeRect(tl.x,tl.y,br.x-tl.x,br.y-tl.y);
+function drawRoom(ctxLocal, roomToCanvasFn, effScale){
+  const tl = roomToCanvasFn(0,0);
+  const br = roomToCanvasFn(room.width,room.height);
+  ctxLocal.strokeStyle="#000";
+  ctxLocal.lineWidth=2;
+  ctxLocal.strokeRect(tl.x,tl.y,br.x-tl.x,br.y-tl.y);
 }
 
-function drawGrid(){
+function drawGrid(ctxLocal, roomToCanvasFn){
   const major = getMajorGridStep();
   const minor = getMinorGridStep();
-  ctx.save();
+  ctxLocal.save();
 
-  ctx.strokeStyle="#eee";
-  ctx.beginPath();
+  ctxLocal.strokeStyle="#eee";
+  ctxLocal.beginPath();
   for(let x=0; x<=room.width+1e-6; x+=minor){
-    const p1=roomToCanvas(x,0), p2=roomToCanvas(x,room.height);
-    ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+    const p1=roomToCanvasFn(x,0), p2=roomToCanvasFn(x,room.height);
+    ctxLocal.moveTo(p1.x,p1.y); ctxLocal.lineTo(p2.x,p2.y);
   }
   for(let y=0; y<=room.height+1e-6; y+=minor){
-    const p1=roomToCanvas(0,y), p2=roomToCanvas(room.width,y);
-    ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+    const p1=roomToCanvasFn(0,y), p2=roomToCanvasFn(room.width,y);
+    ctxLocal.moveTo(p1.x,p1.y); ctxLocal.lineTo(p2.x,p2.y);
   }
-  ctx.stroke();
+  ctxLocal.stroke();
 
-  ctx.strokeStyle="#ccc";
-  ctx.beginPath();
+  ctxLocal.strokeStyle="#ccc";
+  ctxLocal.beginPath();
   for(let x=0; x<=room.width+1e-6; x+=major){
-    const p1=roomToCanvas(x,0), p2=roomToCanvas(x,room.height);
-    ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+    const p1=roomToCanvasFn(x,0), p2=roomToCanvasFn(x,room.height);
+    ctxLocal.moveTo(p1.x,p1.y); ctxLocal.lineTo(p2.x,p2.y);
   }
   for(let y=0; y<=room.height+1e-6; y+=major){
-    const p1=roomToCanvas(0,y), p2=roomToCanvas(room.width,y);
-    ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+    const p1=roomToCanvasFn(0,y), p2=roomToCanvasFn(room.width,y);
+    ctxLocal.moveTo(p1.x,p1.y); ctxLocal.lineTo(p2.x,p2.y);
   }
-  ctx.stroke();
+  ctxLocal.stroke();
 
-  ctx.restore();
+  ctxLocal.restore();
 }
 
 /* Walls */
-function drawWalls() {
+function drawWalls(ctxLocal, roomToCanvasFn) {
   walls.forEach(wall => {
-    const p1 = roomToCanvas(wall.x1, wall.y1);
-    const p2 = roomToCanvas(wall.x2, wall.y2);
+    const p1 = roomToCanvasFn(wall.x1, wall.y1);
+    const p2 = roomToCanvasFn(wall.x2, wall.y2);
 
     let isSelected = (wall.id === selectedWallId);
 
@@ -551,52 +561,52 @@ function drawWalls() {
 
     let width;
     if (wall.style === "exterior") {
-      ctx.strokeStyle = isSelected ? "#ff0000" : "#000000";
+      ctxLocal.strokeStyle = isSelected ? "#ff0000" : "#000000";
       width = baseExterior * scaleFactor;
       if (isSelected) width *= 1.3;
     } else {
-      ctx.strokeStyle = isSelected ? "#ff0000" : "#666666";
+      ctxLocal.strokeStyle = isSelected ? "#ff0000" : "#666666";
       width = baseInterior * scaleFactor;
       if (isSelected) width *= 1.3;
     }
 
-    ctx.lineWidth = width;
+    ctxLocal.lineWidth = width;
 
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
+    ctxLocal.beginPath();
+    ctxLocal.moveTo(p1.x, p1.y);
+    ctxLocal.lineTo(p2.x, p2.y);
+    ctxLocal.stroke();
 
     // Draw endpoint handles if selected
     if (isSelected) {
-      ctx.fillStyle = "#ffffff";
-      ctx.strokeStyle = "#ff0000";
-      ctx.lineWidth = 2;
+      ctxLocal.fillStyle = "#ffffff";
+      ctxLocal.strokeStyle = "#ff0000";
+      ctxLocal.lineWidth = 2;
       [p1, p2].forEach(pt => {
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 6, 0, Math.PI*2);
-        ctx.fill();
-        ctx.stroke();
+        ctxLocal.beginPath();
+        ctxLocal.arc(pt.x, pt.y, 6, 0, Math.PI*2);
+        ctxLocal.fill();
+        ctxLocal.stroke();
       });
     }
   });
 }
 
 /* Items */
-function drawItems(){
-  items.forEach(drawItem);
+function drawItems(ctxLocal, roomToCanvasFn){
+  items.forEach(item => drawItem(ctxLocal, roomToCanvasFn, item));
 }
 
-function drawItem(item){
+function drawItem(ctxLocal, roomToCanvasFn, item){
   if (item.type === "circle") {
-    drawCircleItem(item);
+    drawCircleItem(ctxLocal, roomToCanvasFn, item);
   } else {
-    drawRectItem(item);
+    drawRectItem(ctxLocal, roomToCanvasFn, item);
   }
 }
 
-function drawRectItem(item){
-  const c = roomToCanvas(item.x,item.y);
+function drawRectItem(ctxLocal, roomToCanvasFn, item){
+  const c = roomToCanvasFn(item.x,item.y);
   const s = effectiveScale();
   const w = item.width * s;
   const h = item.depth * s;
@@ -604,88 +614,173 @@ function drawRectItem(item){
   const fillCol = getItemFillColor(item.color);
   const strokeCol = getItemStrokeColor(item.color);
 
-  ctx.save();
-  ctx.translate(c.x,c.y);
-  ctx.rotate(item.rotation || 0);
+  ctxLocal.save();
+  ctxLocal.translate(c.x,c.y);
+  ctxLocal.rotate(item.rotation || 0);
 
-  ctx.fillStyle = fillCol;
-  ctx.strokeStyle = (item.id===selectedItemId ? "#06c" : strokeCol);
-  ctx.lineWidth = (item.id===selectedItemId ? 2 : 1.2);
+  ctxLocal.fillStyle = fillCol;
+  ctxLocal.strokeStyle = (item.id===selectedItemId ? "#06c" : strokeCol);
+  ctxLocal.lineWidth = (item.id===selectedItemId ? 2 : 1.2);
 
-  ctx.fillRect(-w/2,-h/2,w,h);
-  ctx.strokeRect(-w/2,-h/2,w,h);
+  ctxLocal.fillRect(-w/2,-h/2,w,h);
+  ctxLocal.strokeRect(-w/2,-h/2,w,h);
 
-  ctx.save();
-  ctx.rotate(-(item.rotation || 0));
-  ctx.fillStyle="#000";
-  ctx.font="13px system-ui";
-  ctx.textAlign="center";
-  ctx.textBaseline="middle";
-  ctx.fillText(item.name,0,0);
-  ctx.restore();
+  ctxLocal.save();
+  ctxLocal.rotate(-(item.rotation || 0));
+  ctxLocal.fillStyle="#000";
+  ctxLocal.font="13px system-ui";
+  ctxLocal.textAlign="center";
+  ctxLocal.textBaseline="middle";
+  ctxLocal.fillText(item.name,0,0);
+  ctxLocal.restore();
 
-  ctx.restore();
+  ctxLocal.restore();
 
-  if(item.id===selectedItemId) drawRotateHandle(item);
+  if(item.id===selectedItemId) drawRotateHandle(ctxLocal, roomToCanvasFn, item);
 }
 
-function drawCircleItem(item){
-  const c = roomToCanvas(item.x,item.y);
+function drawCircleItem(ctxLocal, roomToCanvasFn, item){
+  const c = roomToCanvasFn(item.x,item.y);
   const s = effectiveScale();
   const r = (item.diameter/2) * s;
 
   const fillCol = getItemFillColor(item.color);
   const strokeCol = getItemStrokeColor(item.color);
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(c.x, c.y, r, 0, Math.PI*2);
-  ctx.fillStyle = fillCol;
-  ctx.fill();
-  ctx.strokeStyle = (item.id===selectedItemId ? "#06c" : strokeCol);
-  ctx.lineWidth = (item.id===selectedItemId ? 2 : 1.2);
-  ctx.stroke();
+  ctxLocal.save();
+  ctxLocal.beginPath();
+  ctxLocal.arc(c.x, c.y, r, 0, Math.PI*2);
+  ctxLocal.fillStyle = fillCol;
+  ctxLocal.fill();
+  ctxLocal.strokeStyle = (item.id===selectedItemId ? "#06c" : strokeCol);
+  ctxLocal.lineWidth = (item.id===selectedItemId ? 2 : 1.2);
+  ctxLocal.stroke();
 
-  ctx.fillStyle="#000";
-  ctx.font="13px system-ui";
-  ctx.textAlign="center";
-  ctx.textBaseline="middle";
-  ctx.fillText(item.name, c.x, c.y);
-  ctx.restore();
+  ctxLocal.fillStyle="#000";
+  ctxLocal.font="13px system-ui";
+  ctxLocal.textAlign="center";
+  ctxLocal.textBaseline="middle";
+  ctxLocal.fillText(item.name, c.x, c.y);
+  ctxLocal.restore();
 }
 
 /* Labels */
-function drawLabels() {
-  ctx.save();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
+function drawLabels(ctxLocal, roomToCanvasFn) {
+  ctxLocal.save();
+  ctxLocal.textAlign = "center";
+  ctxLocal.textBaseline = "middle";
 
   labels.forEach(label => {
-    const p = roomToCanvas(label.x, label.y);
-    ctx.font = getLabelFont(label);
-    ctx.fillStyle = label.color || "#444";
-    ctx.fillText(label.text, p.x, p.y);
+    const p = roomToCanvasFn(label.x, label.y);
+    ctxLocal.font = getLabelFont(label);
+    ctxLocal.fillStyle = label.color || "#444";
+    ctxLocal.fillText(label.text, p.x, p.y);
 
     if (label.id === selectedLabelId) {
-      // Simple highlight box
       const paddingPx = 4;
-      const textWidth = ctx.measureText(label.text).width;
+      const textWidth = ctxLocal.measureText(label.text).width;
       const boxW = textWidth + paddingPx*2;
       const boxH = 20;
-      ctx.strokeStyle = "#ff0000";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(p.x - boxW/2, p.y - boxH/2, boxW, boxH);
+      ctxLocal.strokeStyle = "#ff0000";
+      ctxLocal.lineWidth = 1;
+      ctxLocal.strokeRect(p.x - boxW/2, p.y - boxH/2, boxW, boxH);
     }
   });
 
-  ctx.restore();
+  ctxLocal.restore();
+}
+
+/* Dimensions */
+function drawDimensions(ctxLocal, roomToCanvasFn) {
+  ctxLocal.save();
+  ctxLocal.strokeStyle = "#999";
+  ctxLocal.fillStyle = "#555";
+  ctxLocal.lineWidth = 1;
+  ctxLocal.font = "12px system-ui";
+  ctxLocal.textAlign = "center";
+  ctxLocal.textBaseline = "middle";
+
+  const tl = roomToCanvasFn(0,0);
+  const tr = roomToCanvasFn(room.width,0);
+  const bl = roomToCanvasFn(0,room.height);
+
+  // Top dimension line (width)
+  const yOff = tl.y - 20;
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(tl.x, yOff);
+  ctxLocal.lineTo(tr.x, yOff);
+  ctxLocal.stroke();
+
+  // Arrows
+  const arrowSize = 5;
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(tl.x, yOff);
+  ctxLocal.lineTo(tl.x + arrowSize, yOff - arrowSize);
+  ctxLocal.moveTo(tl.x, yOff);
+  ctxLocal.lineTo(tl.x + arrowSize, yOff + arrowSize);
+
+  ctxLocal.moveTo(tr.x, yOff);
+  ctxLocal.lineTo(tr.x - arrowSize, yOff - arrowSize);
+  ctxLocal.moveTo(tr.x, yOff);
+  ctxLocal.lineTo(tr.x - arrowSize, yOff + arrowSize);
+  ctxLocal.stroke();
+
+  const widthText = room.width.toFixed(2) + " " + room.units;
+  ctxLocal.fillText(widthText, (tl.x + tr.x) / 2, yOff - 10);
+
+  // Left dimension line (height)
+  const xOff = tl.x - 20;
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(xOff, tl.y);
+  ctxLocal.lineTo(xOff, bl.y);
+  ctxLocal.stroke();
+
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(xOff, tl.y);
+  ctxLocal.lineTo(xOff - arrowSize, tl.y + arrowSize);
+  ctxLocal.moveTo(xOff, tl.y);
+  ctxLocal.lineTo(xOff + arrowSize, tl.y + arrowSize);
+
+  ctxLocal.moveTo(xOff, bl.y);
+  ctxLocal.lineTo(xOff - arrowSize, bl.y - arrowSize);
+  ctxLocal.moveTo(xOff, bl.y);
+  ctxLocal.lineTo(xOff + arrowSize, bl.y - arrowSize);
+  ctxLocal.stroke();
+
+  const heightText = room.height.toFixed(2) + " " + room.units;
+  ctxLocal.save();
+  ctxLocal.translate(xOff - 15, (tl.y + bl.y) / 2);
+  ctxLocal.rotate(-Math.PI/2);
+  ctxLocal.fillText(heightText, 0, 0);
+  ctxLocal.restore();
+
+  ctxLocal.restore();
+}
+
+/* Wall preview (rubber-band) */
+function drawWallPreview(ctxLocal, roomToCanvasFn) {
+  if (!wallDraftStart || !wallPreviewCurrent) return;
+
+  const p1 = roomToCanvasFn(wallDraftStart.x, wallDraftStart.y);
+  const p2 = roomToCanvasFn(wallPreviewCurrent.x, wallPreviewCurrent.y);
+
+  ctxLocal.save();
+  ctxLocal.strokeStyle = "rgba(0,0,0,0.5)";
+  ctxLocal.setLineDash([5,4]);
+  ctxLocal.lineWidth = 1;
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(p1.x, p1.y);
+  ctxLocal.lineTo(p2.x, p2.y);
+  ctxLocal.stroke();
+  ctxLocal.setLineDash([]);
+  ctxLocal.restore();
 }
 
 /* Rotate handle */
-function drawRotateHandle(item){
+function drawRotateHandle(ctxLocal, roomToCanvasFn, item){
   if (item.type !== "rect") return; // circles don’t rotate
 
-  const c=roomToCanvas(item.x,item.y);
+  const c=roomToCanvasFn(item.x,item.y);
   const s = effectiveScale();
   const h=item.depth * s;
   const half=h/2, offset=20;
@@ -695,27 +790,26 @@ function drawRotateHandle(item){
   const hx=c.x + L*Math.sin(a);
   const hy=c.y - L*Math.cos(a);
 
-  ctx.save();
-  ctx.fillStyle="#fff";
-  ctx.strokeStyle="#06c";
-  ctx.lineWidth=2;
+  ctxLocal.save();
+  ctxLocal.fillStyle="#fff";
+  ctxLocal.strokeStyle="#06c";
+  ctxLocal.lineWidth=2;
 
-  ctx.beginPath();
-  ctx.arc(hx,hy,7,0,Math.PI*2);
-  ctx.fill();
-  ctx.stroke();
+  ctxLocal.beginPath();
+  ctxLocal.arc(hx,hy,7,0,Math.PI*2);
+  ctxLocal.fill();
+  ctxLocal.stroke();
 
-  ctx.beginPath();
-  ctx.moveTo(c.x,c.y);
-  ctx.lineTo(hx,hy);
-  ctx.stroke();
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(c.x,c.y);
+  ctxLocal.lineTo(hx,hy);
+  ctxLocal.stroke();
 
-  ctx.restore();
+  ctxLocal.restore();
 }
 
 /* ===== HIT TEST (ITEMS ONLY) ===== */
 function getHit(px,py){
-  // items only (walls & labels handled separately)
   for(let i=items.length-1;i>=0;i--){
     const item=items[i];
     if (item.type === "rect" && isRotateHandle(px,py,item)) {
@@ -781,7 +875,6 @@ function hitTestWall(px, py) {
       return { wall, mode: "end2" };
     }
 
-    // distance to line segment
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const len2 = dx*dx + dy*dy;
@@ -800,7 +893,6 @@ function hitTestWall(px, py) {
 
 /* ===== LABEL HIT TEST ===== */
 function hitTestLabel(px, py) {
-  // simple radius around label center
   const radius = 10;
   for (let i = labels.length - 1; i >= 0; i--) {
     const label = labels[i];
@@ -819,7 +911,8 @@ const toolLabelBtn = document.getElementById("toolLabelBtn");
 
 function setToolMode(mode) {
   toolMode = mode;
-  wallDraftStart = null; // cancel any partial wall
+  wallDraftStart = null;
+  wallPreviewCurrent = null;
   toolSelectBtn.classList.remove("active");
   toolWallBtn.classList.remove("active");
   toolLabelBtn.classList.remove("active");
@@ -845,17 +938,18 @@ canvas.addEventListener("mousedown", e=>{
     return;
   }
 
-  // Left button only for drawing/selecting
+  // Left button only
   if (e.button !== 0) return;
 
   const world = canvasToRoom(px, py);
 
-  // TOOL: WALL (single-use)
+  // TOOL: WALL (single-use, with preview)
   if (toolMode === "wall") {
-    const snapped = { x: snapToGrid(world.x), y: snapToGrid(world.y) };
+    const snapped = getSnappedPoint(world, px, py, "wall");
 
     if (!wallDraftStart) {
       wallDraftStart = snapped;
+      wallPreviewCurrent = snapped;
     } else {
       const wallTypeInput = document.querySelector('input[name="wallType"]:checked');
       const style = wallTypeInput ? wallTypeInput.value : "interior";
@@ -870,8 +964,9 @@ canvas.addEventListener("mousedown", e=>{
       });
 
       wallDraftStart = null;
+      wallPreviewCurrent = null;
       markDirty();
-      setToolMode("select"); // single action
+      setToolMode("select");
       draw();
     }
     return;
@@ -897,7 +992,6 @@ canvas.addEventListener("mousedown", e=>{
   }
 
   // TOOL: SELECT
-  // 1) Items
   const hit=getHit(px,py);
   if(hit){
     selectedItemId=hit.item.id;
@@ -923,7 +1017,6 @@ canvas.addEventListener("mousedown", e=>{
     return;
   }
 
-  // 2) Walls
   const wallHit = hitTestWall(px, py);
   if (wallHit) {
     selectedWallId = wallHit.wall.id;
@@ -945,7 +1038,6 @@ canvas.addEventListener("mousedown", e=>{
     return;
   }
 
-  // 3) Labels
   const labelHit = hitTestLabel(px, py);
   if (labelHit) {
     selectedLabelId = labelHit.id;
@@ -959,7 +1051,6 @@ canvas.addEventListener("mousedown", e=>{
     return;
   }
 
-  // Nothing hit
   selectedItemId=null;
   selectedWallId=null;
   selectedLabelId=null;
@@ -975,7 +1066,6 @@ canvas.addEventListener("mousemove", e=>{
   const px=e.clientX-rect.left, py=e.clientY-rect.top;
   const world = canvasToRoom(px, py);
 
-  // Panning with right mouse
   if (isPanning) {
     const dx = e.clientX - panLastX;
     const dy = e.clientY - panLastY;
@@ -987,19 +1077,22 @@ canvas.addEventListener("mousemove", e=>{
     return;
   }
 
-  // Dragging items
+  if (toolMode === "wall" && wallDraftStart) {
+    const snapped = getSnappedPoint(world, px, py, "wall");
+    wallPreviewCurrent = snapped;
+    draw();
+    return;
+  }
+
   if(isDragging && dragItemId){
     const item=items.find(i=>i.id===dragItemId);
     item.x=world.x-dragOffset.x;
     item.y=world.y-dragOffset.y;
-
-    clampItemInsideRoom(item);
     markDirty();
     draw();
     updateSidebar();
   }
 
-  // Rotating items
   if(isRotating && rotateItemId){
     const item=items.find(i=>i.id===rotateItemId);
     if (item.type !== "rect") return;
@@ -1008,14 +1101,12 @@ canvas.addEventListener("mousemove", e=>{
     const ang=Math.atan2(py-c.y, px-c.x);
     item.rotation=rotateStartAngle + (ang-rotateStartMouseAngle);
     snapRotation(item);
-    clampItemInsideRoom(item);
     markDirty();
 
     draw();
     updateSidebar();
   }
 
-  // Dragging walls
   if (wallDragMode && wallDragData) {
     const wall = walls.find(w => w.id === wallDragData.wallId);
     if (!wall) return;
@@ -1024,28 +1115,22 @@ canvas.addEventListener("mousemove", e=>{
       const dx = world.x - wallDragData.startWorld.x;
       const dy = world.y - wallDragData.startWorld.y;
 
-      let nx1 = wallDragData.orig.x1 + dx;
-      let ny1 = wallDragData.orig.y1 + dy;
-      let nx2 = wallDragData.orig.x2 + dx;
-      let ny2 = wallDragData.orig.y2 + dy;
-
-      wall.x1 = snapToGrid(nx1);
-      wall.y1 = snapToGrid(ny1);
-      wall.x2 = snapToGrid(nx2);
-      wall.y2 = snapToGrid(ny2);
+      wall.x1 = wallDragData.orig.x1 + dx;
+      wall.y1 = wallDragData.orig.y1 + dy;
+      wall.x2 = wallDragData.orig.x2 + dx;
+      wall.y2 = wallDragData.orig.y2 + dy;
     } else if (wallDragMode === "end1") {
-      wall.x1 = snapToGrid(world.x);
-      wall.y1 = snapToGrid(world.y);
+      wall.x1 = world.x;
+      wall.y1 = world.y;
     } else if (wallDragMode === "end2") {
-      wall.x2 = snapToGrid(world.x);
-      wall.y2 = snapToGrid(world.y);
+      wall.x2 = world.x;
+      wall.y2 = world.y;
     }
 
     markDirty();
     draw();
   }
 
-  // Dragging labels
   if (labelDragId) {
     const label = labels.find(l => l.id === labelDragId);
     if (label) {
@@ -1078,21 +1163,15 @@ canvas.addEventListener("wheel", (e)=>{
   const px = e.clientX - rect.left;
   const py = e.clientY - rect.top;
 
-  // Room point under cursor BEFORE zoom
   const world = canvasToRoom(px, py);
 
-  // gentler zoom speed
   const factor = (e.deltaY < 0 ? 1.05 : 0.95);
-
   let newViewScale = viewScale * factor;
-
-  // Limit zoom-out so you can't go smaller than the base fit
-  const minViewScale = 1;     // no zoom-out beyond the initial full-room view
+  const minViewScale = 1;
   const maxViewScale = 6;
   newViewScale = Math.max(minViewScale, Math.min(maxViewScale, newViewScale));
   viewScale = newViewScale;
 
-  // Keep cursor's room coordinate stable during zoom
   const s = effectiveScale();
   offsetX = px - padding - world.x * s;
   offsetY = py - padding - world.y * s;
@@ -1120,14 +1199,13 @@ function snapRotation(item){
 document.addEventListener("keydown", e=>{
   if(!selectedItemId)return;
   const item=items.find(i=>i.id===selectedItemId);
-  if (!item || item.type !== "rect") return; // only rectangles rotate
+  if (!item || item.type !== "rect") return;
 
   const step=5*Math.PI/180;
   if(e.key==="[") item.rotation = (item.rotation || 0) - step;
   if(e.key==="]") item.rotation = (item.rotation || 0) + step;
 
   snapRotation(item);
-  clampItemInsideRoom(item);
   markDirty();
   draw();
   updateSidebar();
@@ -1151,7 +1229,6 @@ document.getElementById("addItemBtn").addEventListener("click", ()=>{
     rotation:0,
     color:"blue"
   };
-  clampItemInsideRoom(item);
   items.push(item);
   selectedItemId=item.id;
   selectedWallId=null;
@@ -1177,7 +1254,6 @@ document.getElementById("addCircleBtn").addEventListener("click", ()=>{
     rotation:0,
     color:"blue"
   };
-  clampItemInsideRoom(item);
   items.push(item);
   selectedItemId=item.id;
   selectedWallId=null;
@@ -1197,14 +1273,12 @@ function updateSidebar() {
   const rectFields = document.getElementById("rectFields");
   const circleFields = document.getElementById("circleFields");
 
-  // Hide all editors initially
   noSel.style.display   = "block";
   itemEd.style.display  = "none";
   wallEd.style.display  = "none";
   labelEd.style.display = "none";
   sidebarTitle.textContent = "Nothing Selected";
 
-  // ----- Item selected -----
   if (selectedItemId) {
     const item = items.find(i => i.id === selectedItemId);
     if (!item) return;
@@ -1227,14 +1301,12 @@ function updateSidebar() {
       document.getElementById("editDiameter").value = item.diameter;
     }
 
-    // Set color radios
     const radios = document.querySelectorAll('input[name="editColor"]');
     radios.forEach(r => r.checked = (r.value === item.color));
 
     return;
   }
 
-  // ----- Wall selected -----
   if (selectedWallId) {
     const wall = walls.find(w => w.id === selectedWallId);
     if (!wall) return;
@@ -1249,7 +1321,6 @@ function updateSidebar() {
     return;
   }
 
-  // ----- Label selected -----
   if (selectedLabelId) {
     const label = labels.find(l => l.id === selectedLabelId);
     if (!label) return;
@@ -1292,19 +1363,17 @@ document.getElementById("applyEditBtn").addEventListener("click", ()=>{
       item.rotation=rDeg*Math.PI/180;
       snapRotation(item);
     }
-  } else { // circle
+  } else {
     let dia=parseFloat(document.getElementById("editDiameter").value);
     if(!(dia>0)) dia=item.diameter;
     item.diameter=dia;
   }
 
-  // apply color
   const colorInput = document.querySelector('input[name="editColor"]:checked');
   if (colorInput) {
     item.color = colorInput.value;
   }
 
-  clampItemInsideRoom(item);
   markDirty();
   draw(); 
   updateSidebar();
@@ -1374,14 +1443,7 @@ document.getElementById("applyRoomBtn").addEventListener("click", ()=>{
   room.height=h;
   room.units=document.getElementById("roomUnits").value;
 
-  // Clamp all items to new room size
-  items.forEach(clampItemInsideRoom);
-
   computeBaseScale();
-  viewScale = 1;
-  offsetX = 0;
-  offsetY = 0;
-
   markDirty();
   draw();
 });
@@ -1396,7 +1458,7 @@ document.getElementById("downloadBtn").addEventListener("click", ()=>{
   const a=document.createElement("a");
   a.href=url; a.download="shop_layout.json"; a.click();
   URL.revokeObjectURL(url);
-  markClean(); // user has just downloaded the current state
+  markClean();
 });
 
 const fileInput = document.getElementById("fileInput");
@@ -1418,7 +1480,6 @@ fileInput.addEventListener("change", e=>{
     nextWallId=obj.nextWallId || 1;
     nextLabelId=obj.nextLabelId || 1;
 
-    // Ensure defaults for items
     items.forEach(it=>{
       if (!it.type) it.type="rect";
       if (!it.color) it.color="blue";
@@ -1430,17 +1491,12 @@ fileInput.addEventListener("change", e=>{
       }
     });
 
-    // Defaults for labels
     labels.forEach(l => {
       if (!l.size) l.size = "medium";
       if (!l.color) l.color = "black";
     });
 
     computeBaseScale();
-    viewScale = 1;
-    offsetX = 0;
-    offsetY = 0;
-    items.forEach(clampItemInsideRoom);
     selectedItemId=null;
     selectedWallId=null;
     selectedLabelId=null;
@@ -1452,42 +1508,87 @@ fileInput.addEventListener("change", e=>{
   fileInput.value="";
 });
 
-/* ===== SAVE PDF (EXACT CANVAS SIZE + HEADER) ===== */
+/* ===== SAVE PDF (FULL ROOM, NO SELECTIONS) ===== */
 document.getElementById("pdfBtn").addEventListener("click", ()=>{
   const { jsPDF } = window.jspdf;
   const headerText = document.getElementById("pdfHeader").value || "Shop Layout";
 
-  const dataUrl = canvas.toDataURL("image/png");
+  const pdfPageSize = "letter"; // or "a4"
+  const pdf = new jsPDF({
+    orientation: room.width >= room.height ? "landscape" : "portrait",
+    unit: "pt",
+    format: pdfPageSize
+  });
 
-  const canvasWidth = canvas.width;
-  const canvasHeight = canvas.height;
-
-  const orientation = canvasWidth >= canvasHeight ? "landscape" : "portrait";
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
 
   const headerSpace = 40;
-  const pageWidth = canvasWidth;
-  const pageHeight = canvasHeight + headerSpace;
+  const availableWidth = pageWidth - 40;
+  const availableHeight = pageHeight - headerSpace - 40;
 
-  const pdf = new jsPDF({
-    orientation,
-    unit: "pt",
-    format: [pageWidth, pageHeight]
-  });
+  const aspectRoom = room.width / room.height;
+  const aspectPage = availableWidth / availableHeight;
+
+  let drawWidth, drawHeight;
+  if (aspectRoom > aspectPage) {
+    drawWidth = availableWidth;
+    drawHeight = drawWidth / aspectRoom;
+  } else {
+    drawHeight = availableHeight;
+    drawWidth = drawHeight * aspectRoom;
+  }
+
+  const offCanvas = document.createElement("canvas");
+  offCanvas.width = Math.round(drawWidth);
+  offCanvas.height = Math.round(drawHeight);
+  const offCtx = offCanvas.getContext("2d");
+
+  const localPadding = 20;
+  const s = Math.min(
+    (offCanvas.width - 2*localPadding) / room.width,
+    (offCanvas.height - 2*localPadding) / room.height
+  );
+
+  function roomToCanvasPdf(x, y) {
+    return {
+      x: localPadding + x * s,
+      y: localPadding + y * s
+    };
+  }
+
+  offCtx.fillStyle = "#ffffff";
+  offCtx.fillRect(0,0,offCanvas.width,offCanvas.height);
+
+  drawRoom(offCtx, roomToCanvasPdf, s);
+  drawGrid(offCtx, roomToCanvasPdf);
+  drawWalls(offCtx, roomToCanvasPdf);
+
+  offCtx.save();
+  const tl = roomToCanvasPdf(0,0);
+  const br = roomToCanvasPdf(room.width, room.height);
+  offCtx.beginPath();
+  offCtx.rect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  offCtx.clip();
+
+  drawItems(offCtx, roomToCanvasPdf);
+  drawLabels(offCtx, roomToCanvasPdf);
+
+  offCtx.restore();
+
+  drawDimensions(offCtx, roomToCanvasPdf);
+
+  const dataUrl = offCanvas.toDataURL("image/png");
 
   pdf.setFontSize(14);
   const textWidth = pdf.getTextWidth(headerText);
   const textX = (pageWidth - textWidth) / 2;
-  const textY = 20;
+  const textY = 24;
   pdf.text(headerText, textX, textY);
 
-  pdf.addImage(
-    dataUrl,
-    "PNG",
-    0,
-    headerSpace,
-    canvasWidth,
-    canvasHeight
-  );
+  const imageX = (pageWidth - drawWidth) / 2;
+  const imageY = headerSpace;
+  pdf.addImage(dataUrl, "PNG", imageX, imageY, drawWidth, drawHeight);
 
   pdf.save("shop_layout.pdf");
 });
@@ -1496,7 +1597,7 @@ document.getElementById("pdfBtn").addEventListener("click", ()=>{
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 draw();
-markClean(); // fresh start
+markClean();
 updateSidebar();
 </script>
 
