@@ -38,11 +38,20 @@
     gap: 12px;
   }
 
-  .row-left,
-  .row-right {
+  .row-left {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    align-items: center;
+  }
+
+  .row-right {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-start;
+    text-align: left;
     align-items: center;
   }
 
@@ -643,6 +652,7 @@ window.addEventListener("mouseup", e=>{
 /* ===== MOUSE WHEEL ZOOM ===== */
 canvas.addEventListener("wheel", (e)=>{
   e.preventDefault();
+
   const rect = canvas.getBoundingClientRect();
   const px = e.clientX - rect.left;
   const py = e.clientY - rect.top;
@@ -650,12 +660,18 @@ canvas.addEventListener("wheel", (e)=>{
   // Room point under cursor BEFORE zoom
   const world = canvasToRoom(px, py);
 
-  const factor = (e.deltaY < 0 ? 1.1 : 0.9);
+  // gentler zoom speed
+  const factor = (e.deltaY < 0 ? 1.05 : 0.95);
+
   let newViewScale = viewScale * factor;
-  newViewScale = Math.max(0.25, Math.min(6, newViewScale));
+
+  // Limit zoom-out so you can't go smaller than the base fit
+  const minViewScale = 1;     // no zoom-out beyond the initial full-room view
+  const maxViewScale = 6;
+  newViewScale = Math.max(minViewScale, Math.min(maxViewScale, newViewScale));
   viewScale = newViewScale;
 
-  // Recompute pan so that the same room point stays under the cursor
+  // Keep cursor's room coordinate stable during zoom
   const s = effectiveScale();
   offsetX = px - padding - world.x * s;
   offsetY = py - padding - world.y * s;
