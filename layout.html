@@ -21,21 +21,29 @@
     font-size: 18px;
   }
 
-  /* Top controls bar */
+  /* Top controls container */
   .controls {
     display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
+    flex-direction: column;
+    gap: 6px;
     padding: 10px 12px;
     background: #fafafa;
     border-bottom: 1px solid #ddd;
   }
-  .control-group {
+
+  .controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .row-left,
+  .row-right {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     align-items: center;
-    font-size: 14px;
   }
 
   button, input, select {
@@ -136,50 +144,49 @@
 
 <!-- Controls -->
 <div class="controls">
-  <!-- Room -->
-  <div class="control-group">
-    <label>Room W:</label>
-    <input type="number" id="roomWidth" value="20" step="any">
-    <label>H:</label>
-    <input type="number" id="roomHeight" value="30" step="any">
-    <select id="roomUnits">
-      <option value="ft">Feet</option>
-      <option value="m">Meters</option>
-    </select>
-    <button id="applyRoomBtn">Apply Room</button>
+  <!-- Row 1: Room (left) / Rect (right) -->
+  <div class="controls-row">
+    <div class="row-left">
+      <label>Room W:</label>
+      <input type="number" id="roomWidth" value="20" step="any">
+      <label>H:</label>
+      <input type="number" id="roomHeight" value="30" step="any">
+      <select id="roomUnits">
+        <option value="ft">Feet</option>
+        <option value="m">Meters</option>
+      </select>
+      <button id="applyRoomBtn">Apply Room</button>
+    </div>
+
+    <div class="row-right">
+      <label>Rect:</label>
+      <input type="text" id="itemName" placeholder="Tablesaw" size="10">
+      <label>W:</label>
+      <input type="number" id="itemWidth" value="3" step="any">
+      <label>D:</label>
+      <input type="number" id="itemDepth" value="2" step="any">
+      <button id="addItemBtn">Add Rect</button>
+    </div>
   </div>
 
-  <!-- Rectangles -->
-  <div class="control-group">
-    <label>Rect:</label>
-    <input type="text" id="itemName" placeholder="Tablesaw" size="10">
-    <label>W:</label>
-    <input type="number" id="itemWidth" value="3" step="any">
-    <label>D:</label>
-    <input type="number" id="itemDepth" value="2" step="any">
-    <button id="addItemBtn">Add Rect</button>
-  </div>
+  <!-- Row 2: Save/PDF (left) / Circle (right) -->
+  <div class="controls-row">
+    <div class="row-left">
+      <button id="downloadBtn">Download JSON</button>
+      <button id="uploadBtn">Upload JSON</button>
+      <input type="file" id="fileInput" accept="application/json" style="display:none;">
+      <label>PDF Header:</label>
+      <input type="text" id="pdfHeader" value="Shop Layout">
+      <button id="pdfBtn">Save PDF</button>
+    </div>
 
-  <!-- Circles -->
-  <div class="control-group">
-    <label>Circle:</label>
-    <input type="text" id="circleName" placeholder="Drill Press" size="10">
-    <label>Dia:</label>
-    <input type="number" id="circleDiameter" value="2" step="any">
-    <button id="addCircleBtn">Add Circle</button>
-  </div>
-
-  <!-- File / PDF -->
-  <div class="control-group">
-    <button id="downloadBtn">Download JSON</button>
-    <button id="uploadBtn">Upload JSON</button>
-    <input type="file" id="fileInput" accept="application/json" style="display:none;">
-  </div>
-
-  <div class="control-group">
-    <label>PDF Header:</label>
-    <input type="text" id="pdfHeader" value="Shop Layout">
-    <button id="pdfBtn">Save PDF</button>
+    <div class="row-right">
+      <label>Circle:</label>
+      <input type="text" id="circleName" placeholder="Drill Press" size="10">
+      <label>Dia:</label>
+      <input type="number" id="circleDiameter" value="2" step="any">
+      <button id="addCircleBtn">Add Circle</button>
+    </div>
   </div>
 </div>
 
@@ -225,8 +232,9 @@
 </div>
 
 <div class="hint">
-  Rectangles: click to select, drag to move, drag small circle to rotate, [ and ] to rotate with snap.  
-  Circles: click to select, drag to move.
+  Rectangles: left-click to select, drag to move, drag small circle to rotate, [ and ] to rotate with snap.  
+  Circles: left-click to select, drag to move.  
+  Right-click and drag to pan. Mouse wheel to zoom.
 </div>
 
 <!-- jsPDF CDN -->
@@ -238,7 +246,7 @@ const canvas = document.getElementById("layoutCanvas");
 const ctx = canvas.getContext("2d");
 
 let room = { width: 20, height: 30, units: "ft" };
-let scale = 10;
+let baseScale = 10;     // scale from room units to pixels (before zoom)
 const padding = 30;
 
 let items = [];   // each item: {id, type: "rect"|"circle", name, width, depth, diameter, x, y, rotation}
@@ -256,6 +264,14 @@ let rotateStartMouseAngle = 0;
 
 let isDirty = false; // track unsaved changes
 
+// Zoom + pan
+let viewScale = 1;   // additional zoom factor
+let offsetX = 0;     // pan in pixels
+let offsetY = 0;
+let isPanning = false;
+let panLastX = 0;
+let panLastY = 0;
+
 function markDirty() {
   isDirty = true;
 }
@@ -270,23 +286,47 @@ window.addEventListener("beforeunload", (e) => {
   e.returnValue = "";
 });
 
+/* Prevent right-click menu on canvas (we use right-click for pan) */
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
 /* ===== CANVAS SIZING ===== */
 function resizeCanvas() {
   const rect = document.getElementById("canvasContainer").getBoundingClientRect();
   canvas.width = rect.width;
   canvas.height = rect.height;
-  computeScale();
+  computeBaseScale();
+  // Reset zoom/pan on resize so it doesn't get weird
+  viewScale = 1;
+  offsetX = 0;
+  offsetY = 0;
   draw();
 }
 
-function computeScale() {
+function computeBaseScale() {
   const usableW = canvas.width - padding*2;
   const usableH = canvas.height - padding*2;
-  scale = Math.min(usableW / room.width, usableH / room.height);
+  baseScale = Math.min(usableW / room.width, usableH / room.height);
 }
 
-function roomToCanvas(x,y){ return {x:padding+x*scale, y:padding+y*scale}; }
-function canvasToRoom(x,y){ return {x:(x-padding)/scale, y:(y-padding)/scale}; }
+function effectiveScale() {
+  return baseScale * viewScale;
+}
+
+function roomToCanvas(x,y){
+  const s = effectiveScale();
+  return {
+    x: padding + offsetX + x * s,
+    y: padding + offsetY + y * s
+  };
+}
+
+function canvasToRoom(x,y){
+  const s = effectiveScale();
+  return {
+    x: (x - padding - offsetX) / s,
+    y: (y - padding - offsetY) / s
+  };
+}
 
 /* ===== BOUNDS & CLAMPING (handles rotation) ===== */
 function getItemBounds(item) {
@@ -372,8 +412,9 @@ function drawItem(item){
 
 function drawRectItem(item){
   const c = roomToCanvas(item.x,item.y);
-  const w = item.width*scale;
-  const h = item.depth*scale;
+  const s = effectiveScale();
+  const w = item.width * s;
+  const h = item.depth * s;
 
   ctx.save();
   ctx.translate(c.x,c.y);
@@ -402,7 +443,8 @@ function drawRectItem(item){
 
 function drawCircleItem(item){
   const c = roomToCanvas(item.x,item.y);
-  const r = (item.diameter/2) * scale;
+  const s = effectiveScale();
+  const r = (item.diameter/2) * s;
 
   ctx.save();
   ctx.beginPath();
@@ -425,7 +467,8 @@ function drawRotateHandle(item){
   if (item.type !== "rect") return; // circles don’t rotate
 
   const c=roomToCanvas(item.x,item.y);
-  const h=item.depth*scale;
+  const s = effectiveScale();
+  const h=item.depth * s;
   const half=h/2, offset=20;
   const L=half+offset;
   const a = item.rotation || 0;
@@ -468,7 +511,8 @@ function getHit(px,py){
 function isInsideItem(px,py,item){
   if (item.type === "circle") {
     const c = roomToCanvas(item.x,item.y);
-    const r = (item.diameter/2) * scale;
+    const s = effectiveScale();
+    const r = (item.diameter/2) * s;
     return Math.hypot(px - c.x, py - c.y) <= r;
   } else {
     const c = roomToCanvas(item.x,item.y);
@@ -477,7 +521,8 @@ function isInsideItem(px,py,item){
     const cos=Math.cos(-a), sin=Math.sin(-a);
     let x=dx*cos - dy*sin;
     let y=dx*sin + dy*cos;
-    const hw=item.width*scale/2, hh=item.depth*scale/2;
+    const s = effectiveScale();
+    const hw=item.width*s/2, hh=item.depth*s/2;
     return (x>=-hw && x<=hw && y>=-hh && y<=hh);
   }
 }
@@ -485,7 +530,8 @@ function isInsideItem(px,py,item){
 function isRotateHandle(px,py,item){
   if (item.type !== "rect") return false;
   const c=roomToCanvas(item.x,item.y);
-  const h=item.depth*scale;
+  const s = effectiveScale();
+  const h=item.depth*s;
   const half=h/2, offset=20;
   const L=half+offset;
   const a = item.rotation || 0;
@@ -500,6 +546,17 @@ function isRotateHandle(px,py,item){
 canvas.addEventListener("mousedown", e=>{
   const rect=canvas.getBoundingClientRect();
   const px=e.clientX-rect.left, py=e.clientY-rect.top;
+
+  // Right-click: start panning
+  if (e.button === 2) {
+    isPanning = true;
+    panLastX = e.clientX;
+    panLastY = e.clientY;
+    return;
+  }
+
+  // Only handle selection/drag with left button
+  if (e.button !== 0) return;
 
   const hit=getHit(px,py);
 
@@ -533,6 +590,18 @@ canvas.addEventListener("mousemove", e=>{
   const rect=canvas.getBoundingClientRect();
   const px=e.clientX-rect.left, py=e.clientY-rect.top;
 
+  // Panning with right mouse
+  if (isPanning) {
+    const dx = e.clientX - panLastX;
+    const dy = e.clientY - panLastY;
+    panLastX = e.clientX;
+    panLastY = e.clientY;
+    offsetX += dx;
+    offsetY += dy;
+    draw();
+    return;
+  }
+
   if(isDragging && dragItemId){
     const item=items.find(i=>i.id===dragItemId);
     const rp=canvasToRoom(px,py);
@@ -547,7 +616,7 @@ canvas.addEventListener("mousemove", e=>{
 
   if(isRotating && rotateItemId){
     const item=items.find(i=>i.id===rotateItemId);
-    if (item.type !== "rect") return; // just in case
+    if (item.type !== "rect") return;
 
     const c=roomToCanvas(item.x,item.y);
     const ang=Math.atan2(py-c.y, px-c.x);
@@ -561,12 +630,38 @@ canvas.addEventListener("mousemove", e=>{
   }
 });
 
-window.addEventListener("mouseup", ()=>{
+window.addEventListener("mouseup", e=>{
   isDragging=false;
   dragItemId=null;
   isRotating=false;
   rotateItemId=null;
+  if (e.button === 2) {
+    isPanning = false;
+  }
 });
+
+/* ===== MOUSE WHEEL ZOOM ===== */
+canvas.addEventListener("wheel", (e)=>{
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+
+  // Room point under cursor BEFORE zoom
+  const world = canvasToRoom(px, py);
+
+  const factor = (e.deltaY < 0 ? 1.1 : 0.9);
+  let newViewScale = viewScale * factor;
+  newViewScale = Math.max(0.25, Math.min(6, newViewScale));
+  viewScale = newViewScale;
+
+  // Recompute pan so that the same room point stays under the cursor
+  const s = effectiveScale();
+  offsetX = px - padding - world.x * s;
+  offsetY = py - padding - world.y * s;
+
+  draw();
+}, { passive: false });
 
 /* ===== SNAP ROTATION ===== */
 function snapRotation(item){
@@ -738,7 +833,11 @@ document.getElementById("applyRoomBtn").addEventListener("click", ()=>{
   // Clamp all items to new room size
   items.forEach(clampItemInsideRoom);
 
-  computeScale();
+  computeBaseScale();
+  viewScale = 1;
+  offsetX = 0;
+  offsetY = 0;
+
   markDirty();
   draw();
 });
@@ -768,18 +867,19 @@ document.getElementById("fileInput").addEventListener("change", e=>{
     room=obj.room;
     items=obj.items || [];
     nextItemId=obj.nextItemId || 1;
-    // Make sure items have type where missing (for old files)
     items.forEach(it=>{
       if (!it.type) it.type="rect";
       if (it.type==="circle" && typeof it.diameter!=="number") {
-        // fallback if someone saved weird
         it.type="rect";
       }
       if (it.type==="rect" && typeof it.rotation!=="number") {
         it.rotation=0;
       }
     });
-    computeScale();
+    computeBaseScale();
+    viewScale = 1;
+    offsetX = 0;
+    offsetY = 0;
     items.forEach(clampItemInsideRoom);
     selectedItemId=null;
     markClean();
