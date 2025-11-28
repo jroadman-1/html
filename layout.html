@@ -601,6 +601,7 @@ function drawWallWithDoors(ctxLocal, roomToCanvasFn, wall, wallDoors) {
   });
 }
 
+/* -------- FIXED DOOR DRAWING: full-width radius, thin leaf line -------- */
 function drawDoorSymbol(ctxLocal, roomToCanvasFn, wall, door) {
   if (door.swing === "none") return;
 
@@ -616,57 +617,66 @@ function drawDoorSymbol(ctxLocal, roomToCanvasFn, wall, door) {
   let e = door.offset + halfFrac;
   s = Math.max(0, Math.min(1, s));
   e = Math.max(0, Math.min(1, e));
+  if (e <= s) return;
 
   const startX = x1 + dx * s;
   const startY = y1 + dy * s;
   const endX   = x1 + dx * e;
   const endY   = y1 + dy * e;
 
-  let hingeX, hingeY;
+  let hingeX, hingeY, leafX, leafY;
   if (door.swing.endsWith("left")) {
     hingeX = startX;
     hingeY = startY;
+    leafX  = endX;
+    leafY  = endY;
   } else {
     hingeX = endX;
     hingeY = endY;
+    leafX  = startX;
+    leafY  = startY;
   }
 
-  const hxCanvas = roomToCanvasFn(hingeX, hingeY);
+  const hingeCanvas = roomToCanvasFn(hingeX, hingeY);
+  const leafCanvas  = roomToCanvasFn(leafX, leafY);
+  const leafRadius  = Math.hypot(leafCanvas.x - hingeCanvas.x, leafCanvas.y - hingeCanvas.y);
 
-  const leafEndCanvas = roomToCanvasFn(
-    (startX + endX) / 2,
-    (startY + endY) / 2
-  );
-  const leafRadius = Math.hypot(leafEndCanvas.x - hxCanvas.x, leafEndCanvas.y - hxCanvas.y);
+  const baseAngle = Math.atan2(leafCanvas.y - hingeCanvas.y, leafCanvas.x - hingeCanvas.x);
 
-  const baseAngle = Math.atan2(dy, dx);
-  let sweep = Math.PI / 2;
+  const sweep = Math.PI / 2;
   let direction = 1;
-
   if (door.swing === "in-left" || door.swing === "out-right") {
     direction = 1;
-  } else {
+  } else if (door.swing === "in-right" || door.swing === "out-left") {
     direction = -1;
   }
 
   const startAngle = baseAngle;
-  const endAngle = baseAngle + direction * sweep;
+  const endAngle   = baseAngle + direction * sweep;
 
   ctxLocal.save();
   ctxLocal.strokeStyle = "#444";
   ctxLocal.lineWidth = 1.2;
 
   ctxLocal.beginPath();
-  ctxLocal.moveTo(hxCanvas.x, hxCanvas.y);
-  ctxLocal.lineTo(leafEndCanvas.x, leafEndCanvas.y);
+  ctxLocal.moveTo(hingeCanvas.x, hingeCanvas.y);
+  ctxLocal.lineTo(leafCanvas.x, leafCanvas.y);
   ctxLocal.stroke();
 
   ctxLocal.beginPath();
-  ctxLocal.arc(hxCanvas.x, hxCanvas.y, leafRadius, startAngle, endAngle, direction < 0);
+  ctxLocal.arc(
+    hingeCanvas.x,
+    hingeCanvas.y,
+    leafRadius,
+    startAngle,
+    endAngle,
+    direction < 0
+  );
   ctxLocal.stroke();
 
   ctxLocal.restore();
 }
+/* ---------------------------------------------------------------------- */
 
 function drawItems(ctxLocal, roomToCanvasFn){
   items.forEach(item => drawItem(ctxLocal, roomToCanvasFn, item));
