@@ -228,10 +228,11 @@
 
   <!-- Sidebar -->
   <div id="sidebar">
-    <h3>Item Details</h3>
+    <h3 id="sidebarTitle">Nothing Selected</h3>
 
-    <div id="noSelection"><p>No item selected.</p></div>
+    <div id="noSelection"><p>No item, wall, or label selected.</p></div>
 
+    <!-- Item editor -->
     <div id="itemEditor" style="display:none;">
       <label>Name:</label>
       <input type="text" id="editName">
@@ -264,16 +265,46 @@
       </div>
 
       <button id="applyEditBtn">Apply Changes</button>
-      <button id="deleteItemBtn" class="danger">Delete</button>
+      <button id="deleteItemBtn" class="danger">Delete Item</button>
     </div>
+
+    <!-- Wall editor -->
+    <div id="wallEditor" style="display:none;">
+      <label>Wall Type:</label><br>
+      <label><input type="radio" name="wallEditType" value="interior"> Interior</label><br>
+      <label><input type="radio" name="wallEditType" value="exterior"> Exterior</label><br><br>
+
+      <button id="applyWallEditBtn">Apply Changes</button>
+      <button id="deleteWallBtn" class="danger">Delete Wall</button>
+    </div>
+
+    <!-- Label editor -->
+    <div id="labelEditor" style="display:none;">
+      <label>Text:</label>
+      <input type="text" id="editLabelText">
+
+      <label>Size:</label><br>
+      <label><input type="radio" name="labelSize" value="small"> Small</label><br>
+      <label><input type="radio" name="labelSize" value="medium" checked> Medium</label><br>
+      <label><input type="radio" name="labelSize" value="large"> Large</label><br><br>
+
+      <label>Color:</label><br>
+      <label><input type="radio" name="labelColor" value="black" checked> Black</label><br>
+      <label><input type="radio" name="labelColor" value="gray"> Gray</label><br>
+      <label><input type="radio" name="labelColor" value="blue"> Blue</label><br><br>
+
+      <button id="applyLabelEditBtn">Apply Changes</button>
+      <button id="deleteLabelBtn" class="danger">Delete Label</button>
+    </div>
+
   </div>
 </div>
 
 <div class="hint">
   Rectangles: left-click to select, drag to move, drag small circle to rotate, [ and ] to rotate with snap.  
   Circles: left-click to select, drag to move.  
-  Walls: choose "Add Wall", click start (snaps to grid), click end (snaps). One wall per click of the tool.  
-  Labels: choose "Add Label" and click to place text. One label per click of the tool.  
+  Walls: choose "Add Wall", click start (snaps to grid), click end (snaps). One wall per click of the tool. Click wall or its endpoints to edit and drag.  
+  Labels: choose "Add Label" and click to place text. Click a label to edit text, size, color, and drag to move.  
   Right-click and drag to pan. Mouse wheel to zoom.
 </div>
 
@@ -291,7 +322,7 @@ const padding = 30;
 
 let items = [];   // {id, type: "rect"|"circle", name, width, depth, diameter, x, y, rotation, color}
 let walls = [];   // {id, x1,y1,x2,y2, style: "interior"|"exterior"}
-let labels = [];  // {id, text, x, y, size: "medium"}
+let labels = [];  // {id, text, x, y, size: "small|medium|large", color}
 let nextItemId = 1;
 let nextWallId = 1;
 let nextLabelId = 1;
@@ -443,6 +474,16 @@ function getItemStrokeColor(color) {
   }
 }
 
+/* ===== LABEL FONT HELPER ===== */
+function getLabelFont(label) {
+  switch (label.size) {
+    case "small": return "12px system-ui";
+    case "large": return "20px system-ui";
+    case "medium":
+    default: return "14px system-ui";
+  }
+}
+
 /* ===== DRAWING ===== */
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -501,13 +542,25 @@ function drawWalls() {
 
     let isSelected = (wall.id === selectedWallId);
 
+    // Scale wall thickness with zoom, but gently
+    const scaleFactor = Math.sqrt(viewScale);
+
+    // Base pixel thickness
+    let baseInterior = 2;
+    let baseExterior = 4;
+
+    let width;
     if (wall.style === "exterior") {
       ctx.strokeStyle = isSelected ? "#ff0000" : "#000000";
-      ctx.lineWidth = isSelected ? 8 : 6;
+      width = baseExterior * scaleFactor;
+      if (isSelected) width *= 1.3;
     } else {
       ctx.strokeStyle = isSelected ? "#ff0000" : "#666666";
-      ctx.lineWidth = isSelected ? 5 : 3;
+      width = baseInterior * scaleFactor;
+      if (isSelected) width *= 1.3;
     }
+
+    ctx.lineWidth = width;
 
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
@@ -604,13 +657,13 @@ function drawCircleItem(item){
 /* Labels */
 function drawLabels() {
   ctx.save();
-  ctx.font = "14px system-ui";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
   labels.forEach(label => {
     const p = roomToCanvas(label.x, label.y);
-    ctx.fillStyle = "#444";
+    ctx.font = getLabelFont(label);
+    ctx.fillStyle = label.color || "#444";
     ctx.fillText(label.text, p.x, p.y);
 
     if (label.id === selectedLabelId) {
@@ -833,7 +886,8 @@ canvas.addEventListener("mousedown", e=>{
         text: text.trim(),
         x: world.x,
         y: world.y,
-        size: "medium"
+        size: "medium",
+        color: "black"
       });
       markDirty();
       draw();
@@ -875,7 +929,7 @@ canvas.addEventListener("mousedown", e=>{
     selectedWallId = wallHit.wall.id;
     selectedItemId = null;
     selectedLabelId = null;
-    updateSidebar(); // will show "no item selected"
+    updateSidebar();
     wallDragMode = wallHit.mode;
     wallDragData = {
       wallId: wallHit.wall.id,
@@ -975,7 +1029,6 @@ canvas.addEventListener("mousemove", e=>{
       let nx2 = wallDragData.orig.x2 + dx;
       let ny2 = wallDragData.orig.y2 + dy;
 
-      // snap endpoints to grid
       wall.x1 = snapToGrid(nx1);
       wall.y1 = snapToGrid(ny1);
       wall.x2 = snapToGrid(nx2);
@@ -1134,50 +1187,92 @@ document.getElementById("addCircleBtn").addEventListener("click", ()=>{
   draw(); updateSidebar();
 });
 
-/* ===== SIDEBAR (ITEMS ONLY) ===== */
-function updateSidebar(){
-  const noSel=document.getElementById("noSelection");
-  const editor=document.getElementById("itemEditor");
-  const rectFields=document.getElementById("rectFields");
-  const circleFields=document.getElementById("circleFields");
+/* ===== SIDEBAR UPDATER ===== */
+function updateSidebar() {
+  const sidebarTitle = document.getElementById("sidebarTitle");
+  const noSel   = document.getElementById("noSelection");
+  const itemEd  = document.getElementById("itemEditor");
+  const wallEd  = document.getElementById("wallEditor");
+  const labelEd = document.getElementById("labelEditor");
+  const rectFields = document.getElementById("rectFields");
+  const circleFields = document.getElementById("circleFields");
 
-  if(!selectedItemId){
-    noSel.style.display="block";
-    editor.style.display="none";
+  // Hide all editors initially
+  noSel.style.display   = "block";
+  itemEd.style.display  = "none";
+  wallEd.style.display  = "none";
+  labelEd.style.display = "none";
+  sidebarTitle.textContent = "Nothing Selected";
+
+  // ----- Item selected -----
+  if (selectedItemId) {
+    const item = items.find(i => i.id === selectedItemId);
+    if (!item) return;
+
+    noSel.style.display = "none";
+    itemEd.style.display = "block";
+    sidebarTitle.textContent = "Item Details";
+
+    document.getElementById("editName").value = item.name;
+
+    if (item.type === "rect") {
+      rectFields.style.display = "block";
+      circleFields.style.display = "none";
+      document.getElementById("editWidth").value = item.width;
+      document.getElementById("editDepth").value = item.depth;
+      document.getElementById("editRotation").value = ((item.rotation||0)*180/Math.PI).toFixed(2);
+    } else {
+      rectFields.style.display = "none";
+      circleFields.style.display = "block";
+      document.getElementById("editDiameter").value = item.diameter;
+    }
+
+    // Set color radios
+    const radios = document.querySelectorAll('input[name="editColor"]');
+    radios.forEach(r => r.checked = (r.value === item.color));
+
     return;
   }
 
-  const item=items.find(i=>i.id===selectedItemId);
-  if (!item) {
-    noSel.style.display="block";
-    editor.style.display="none";
+  // ----- Wall selected -----
+  if (selectedWallId) {
+    const wall = walls.find(w => w.id === selectedWallId);
+    if (!wall) return;
+
+    noSel.style.display = "none";
+    wallEd.style.display = "block";
+    sidebarTitle.textContent = "Wall Details";
+
+    const typeRadios = document.querySelectorAll('input[name="wallEditType"]');
+    typeRadios.forEach(r => r.checked = (r.value === wall.style));
+
     return;
   }
 
-  noSel.style.display="none";
-  editor.style.display="block";
+  // ----- Label selected -----
+  if (selectedLabelId) {
+    const label = labels.find(l => l.id === selectedLabelId);
+    if (!label) return;
 
-  document.getElementById("editName").value=item.name;
+    noSel.style.display = "none";
+    labelEd.style.display = "block";
+    sidebarTitle.textContent = "Label Details";
 
-  if (item.type === "rect") {
-    rectFields.style.display="block";
-    circleFields.style.display="none";
-    document.getElementById("editWidth").value=item.width;
-    document.getElementById("editDepth").value=item.depth;
-    document.getElementById("editRotation").value=((item.rotation || 0)*180/Math.PI).toFixed(2);
-  } else {
-    rectFields.style.display="none";
-    circleFields.style.display="block";
-    document.getElementById("editDiameter").value=item.diameter;
+    document.getElementById("editLabelText").value = label.text;
+
+    document.querySelectorAll("input[name='labelSize']").forEach(r => {
+      r.checked = (r.value === (label.size || "medium"));
+    });
+
+    document.querySelectorAll("input[name='labelColor']").forEach(r => {
+      r.checked = (r.value === (label.color || "black"));
+    });
+
+    return;
   }
-
-  // Set color radios
-  const colorRadios = document.querySelectorAll('input[name="editColor"]');
-  colorRadios.forEach(r => {
-    r.checked = (r.value === (item.color || "blue"));
-  });
 }
 
+/* ===== ITEM EDIT APPLY / DELETE ===== */
 document.getElementById("applyEditBtn").addEventListener("click", ()=>{
   const item=items.find(i=>i.id===selectedItemId);
   if(!item)return;
@@ -1222,6 +1317,53 @@ document.getElementById("deleteItemBtn").addEventListener("click", ()=>{
   draw(); updateSidebar();
 });
 
+/* ===== WALL EDIT APPLY / DELETE ===== */
+document.getElementById("applyWallEditBtn").addEventListener("click", ()=>{
+  const wall = walls.find(w => w.id === selectedWallId);
+  if (!wall) return;
+
+  const r = document.querySelector('input[name="wallEditType"]:checked');
+  if (r) wall.style = r.value || "interior";
+
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+document.getElementById("deleteWallBtn").addEventListener("click", ()=>{
+  walls = walls.filter(w => w.id !== selectedWallId);
+  selectedWallId = null;
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+/* ===== LABEL EDIT APPLY / DELETE ===== */
+document.getElementById("applyLabelEditBtn").addEventListener("click", ()=>{
+  const label = labels.find(l => l.id === selectedLabelId);
+  if (!label) return;
+
+  label.text = document.getElementById("editLabelText").value;
+
+  const s = document.querySelector("input[name='labelSize']:checked");
+  if (s) label.size = s.value;
+
+  const c = document.querySelector("input[name='labelColor']:checked");
+  if (c) label.color = c.value;
+
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+document.getElementById("deleteLabelBtn").addEventListener("click", ()=>{
+  labels = labels.filter(l => l.id !== selectedLabelId);
+  selectedLabelId = null;
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
 /* ===== ROOM APPLY ===== */
 document.getElementById("applyRoomBtn").addEventListener("click", ()=>{
   const w=parseFloat(document.getElementById("roomWidth").value);
@@ -1257,9 +1399,11 @@ document.getElementById("downloadBtn").addEventListener("click", ()=>{
   markClean(); // user has just downloaded the current state
 });
 
+const fileInput = document.getElementById("fileInput");
+
 document.getElementById("uploadBtn").addEventListener("click", ()=>fileInput.click());
 
-document.getElementById("fileInput").addEventListener("change", e=>{
+fileInput.addEventListener("change", e=>{
   const file=e.target.files[0];
   if(!file)return;
 
@@ -1274,7 +1418,7 @@ document.getElementById("fileInput").addEventListener("change", e=>{
     nextWallId=obj.nextWallId || 1;
     nextLabelId=obj.nextLabelId || 1;
 
-    // Ensure color + rotation defaults
+    // Ensure defaults for items
     items.forEach(it=>{
       if (!it.type) it.type="rect";
       if (!it.color) it.color="blue";
@@ -1284,6 +1428,12 @@ document.getElementById("fileInput").addEventListener("change", e=>{
       if (it.type==="rect" && typeof it.rotation!=="number") {
         it.rotation=0;
       }
+    });
+
+    // Defaults for labels
+    labels.forEach(l => {
+      if (!l.size) l.size = "medium";
+      if (!l.color) l.color = "black";
     });
 
     computeBaseScale();
@@ -1347,6 +1497,7 @@ window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 draw();
 markClean(); // fresh start
+updateSidebar();
 </script>
 
 </body>
