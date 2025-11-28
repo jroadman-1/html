@@ -179,11 +179,6 @@
       <input type="number" id="itemWidth" value="3" step="any">
       <label>D:</label>
       <input type="number" id="itemDepth" value="2" step="any">
-      <label>Color:</label>
-      <label><input type="radio" name="rectColor" value="blue" checked>Blue</label>
-      <label><input type="radio" name="rectColor" value="green">Green</label>
-      <label><input type="radio" name="rectColor" value="orange">Orange</label>
-      <label><input type="radio" name="rectColor" value="gray">Gray</label>
       <button id="addItemBtn">Add Rect</button>
     </div>
   </div>
@@ -204,11 +199,6 @@
       <input type="text" id="circleName" placeholder="Drill Press" size="10">
       <label>Dia:</label>
       <input type="number" id="circleDiameter" value="2" step="any">
-      <label>Color:</label>
-      <label><input type="radio" name="circleColor" value="blue" checked>Blue</label>
-      <label><input type="radio" name="circleColor" value="green">Green</label>
-      <label><input type="radio" name="circleColor" value="orange">Orange</label>
-      <label><input type="radio" name="circleColor" value="gray">Gray</label>
       <button id="addCircleBtn">Add Circle</button>
     </div>
   </div>
@@ -264,6 +254,15 @@
         <input type="number" id="editDiameter" step="any">
       </div>
 
+      <!-- Color fields -->
+      <div id="colorFields">
+        <label>Color:</label><br>
+        <label><input type="radio" name="editColor" value="blue">Blue</label>
+        <label><input type="radio" name="editColor" value="green">Green</label>
+        <label><input type="radio" name="editColor" value="orange">Orange</label>
+        <label><input type="radio" name="editColor" value="gray">Gray</label>
+      </div>
+
       <button id="applyEditBtn">Apply Changes</button>
       <button id="deleteItemBtn" class="danger">Delete</button>
     </div>
@@ -273,8 +272,8 @@
 <div class="hint">
   Rectangles: left-click to select, drag to move, drag small circle to rotate, [ and ] to rotate with snap.  
   Circles: left-click to select, drag to move.  
-  Walls: choose "Add Wall", click start, click end. Wall type is Interior/Exterior.  
-  Labels: choose "Add Label" and click to place text.  
+  Walls: choose "Add Wall", click start (snaps to grid), click end (snaps). One wall per click of the tool.  
+  Labels: choose "Add Label" and click to place text. One label per click of the tool.  
   Right-click and drag to pan. Mouse wheel to zoom.
 </div>
 
@@ -297,7 +296,9 @@ let nextItemId = 1;
 let nextWallId = 1;
 let nextLabelId = 1;
 
-let selectedItemId = null; // still only for items
+let selectedItemId = null;
+let selectedWallId = null;
+let selectedLabelId = null;
 
 let isDragging = false;
 let dragItemId = null;
@@ -307,6 +308,14 @@ let isRotating = false;
 let rotateItemId = null;
 let rotateStartAngle = 0;
 let rotateStartMouseAngle = 0;
+
+// wall drag
+let wallDragMode = null; // "line" | "end1" | "end2" | null
+let wallDragData = null; // { wallId, startWorld, orig }
+
+// label drag
+let labelDragId = null;
+let labelDragOffset = { x: 0, y: 0 };
 
 let isDirty = false; // track unsaved changes
 
@@ -338,6 +347,18 @@ window.addEventListener("beforeunload", (e) => {
 
 /* Prevent right-click menu on canvas (we use right-click for pan) */
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+/* ===== GRID STEP / SNAP ===== */
+function getMinorGridStep() {
+  return room.units === "m" ? 0.1 : 0.25;
+}
+function getMajorGridStep() {
+  return room.units === "m" ? 0.5 : 1.0;
+}
+function snapToGrid(v) {
+  const step = getMinorGridStep();
+  return Math.round(v / step) * step;
+}
 
 /* ===== CANVAS SIZING ===== */
 function resizeCanvas() {
@@ -441,16 +462,17 @@ function drawRoom(){
 }
 
 function drawGrid(){
-  const major=1, minor=0.25;
+  const major = getMajorGridStep();
+  const minor = getMinorGridStep();
   ctx.save();
 
   ctx.strokeStyle="#eee";
   ctx.beginPath();
-  for(let x=0; x<=room.width; x+=minor){
+  for(let x=0; x<=room.width+1e-6; x+=minor){
     const p1=roomToCanvas(x,0), p2=roomToCanvas(x,room.height);
     ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
   }
-  for(let y=0; y<=room.height; y+=minor){
+  for(let y=0; y<=room.height+1e-6; y+=minor){
     const p1=roomToCanvas(0,y), p2=roomToCanvas(room.width,y);
     ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
   }
@@ -458,11 +480,11 @@ function drawGrid(){
 
   ctx.strokeStyle="#ccc";
   ctx.beginPath();
-  for(let x=0; x<=room.width; x+=major){
+  for(let x=0; x<=room.width+1e-6; x+=major){
     const p1=roomToCanvas(x,0), p2=roomToCanvas(x,room.height);
     ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
   }
-  for(let y=0; y<=room.height; y+=major){
+  for(let y=0; y<=room.height+1e-6; y+=major){
     const p1=roomToCanvas(0,y), p2=roomToCanvas(room.width,y);
     ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
   }
@@ -477,18 +499,33 @@ function drawWalls() {
     const p1 = roomToCanvas(wall.x1, wall.y1);
     const p2 = roomToCanvas(wall.x2, wall.y2);
 
+    let isSelected = (wall.id === selectedWallId);
+
     if (wall.style === "exterior") {
-      ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 6;
+      ctx.strokeStyle = isSelected ? "#ff0000" : "#000000";
+      ctx.lineWidth = isSelected ? 8 : 6;
     } else {
-      ctx.strokeStyle = "#666666";
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = isSelected ? "#ff0000" : "#666666";
+      ctx.lineWidth = isSelected ? 5 : 3;
     }
 
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
+
+    // Draw endpoint handles if selected
+    if (isSelected) {
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#ff0000";
+      ctx.lineWidth = 2;
+      [p1, p2].forEach(pt => {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 6, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+      });
+    }
   });
 }
 
@@ -567,14 +604,25 @@ function drawCircleItem(item){
 /* Labels */
 function drawLabels() {
   ctx.save();
-  ctx.fillStyle = "#444";
   ctx.font = "14px system-ui";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
   labels.forEach(label => {
     const p = roomToCanvas(label.x, label.y);
+    ctx.fillStyle = "#444";
     ctx.fillText(label.text, p.x, p.y);
+
+    if (label.id === selectedLabelId) {
+      // Simple highlight box
+      const paddingPx = 4;
+      const textWidth = ctx.measureText(label.text).width;
+      const boxW = textWidth + paddingPx*2;
+      const boxH = 20;
+      ctx.strokeStyle = "#ff0000";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(p.x - boxW/2, p.y - boxH/2, boxW, boxH);
+    }
   });
 
   ctx.restore();
@@ -612,9 +660,9 @@ function drawRotateHandle(item){
   ctx.restore();
 }
 
-/* ===== HIT TEST (ITEMS ONLY for now) ===== */
+/* ===== HIT TEST (ITEMS ONLY) ===== */
 function getHit(px,py){
-  // items only (walls & labels are created tools for now, not selectable)
+  // items only (walls & labels handled separately)
   for(let i=items.length-1;i>=0;i--){
     const item=items[i];
     if (item.type === "rect" && isRotateHandle(px,py,item)) {
@@ -661,6 +709,56 @@ function isRotateHandle(px,py,item){
   return Math.hypot(px-hx,py-hy)<=10;
 }
 
+/* ===== WALL HIT TEST ===== */
+function hitTestWall(px, py) {
+  const endRadius = 10;      // px for endpoint
+  const lineThreshold = 6;   // px for line
+
+  for (let i = walls.length - 1; i >= 0; i--) {
+    const wall = walls[i];
+    const p1 = roomToCanvas(wall.x1, wall.y1);
+    const p2 = roomToCanvas(wall.x2, wall.y2);
+
+    const d1 = Math.hypot(px - p1.x, py - p1.y);
+    if (d1 <= endRadius) {
+      return { wall, mode: "end1" };
+    }
+    const d2 = Math.hypot(px - p2.x, py - p2.y);
+    if (d2 <= endRadius) {
+      return { wall, mode: "end2" };
+    }
+
+    // distance to line segment
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len2 = dx*dx + dy*dy;
+    if (len2 === 0) continue;
+    let t = ((px - p1.x)*dx + (py - p1.y)*dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const projX = p1.x + t*dx;
+    const projY = p1.y + t*dy;
+    const distLine = Math.hypot(px - projX, py - projY);
+    if (distLine <= lineThreshold) {
+      return { wall, mode: "line" };
+    }
+  }
+  return null;
+}
+
+/* ===== LABEL HIT TEST ===== */
+function hitTestLabel(px, py) {
+  // simple radius around label center
+  const radius = 10;
+  for (let i = labels.length - 1; i >= 0; i--) {
+    const label = labels[i];
+    const p = roomToCanvas(label.x, label.y);
+    if (Math.hypot(px - p.x, py - p.y) <= radius) {
+      return label;
+    }
+  }
+  return null;
+}
+
 /* ===== TOOL BUTTONS ===== */
 const toolSelectBtn = document.getElementById("toolSelectBtn");
 const toolWallBtn = document.getElementById("toolWallBtn");
@@ -694,14 +792,17 @@ canvas.addEventListener("mousedown", e=>{
     return;
   }
 
-  // Only handle left button for tools/items
+  // Left button only for drawing/selecting
   if (e.button !== 0) return;
 
-  // TOOL: WALL
+  const world = canvasToRoom(px, py);
+
+  // TOOL: WALL (single-use)
   if (toolMode === "wall") {
-    const world = canvasToRoom(px, py);
+    const snapped = { x: snapToGrid(world.x), y: snapToGrid(world.y) };
+
     if (!wallDraftStart) {
-      wallDraftStart = world;
+      wallDraftStart = snapped;
     } else {
       const wallTypeInput = document.querySelector('input[name="wallType"]:checked');
       const style = wallTypeInput ? wallTypeInput.value : "interior";
@@ -710,21 +811,21 @@ canvas.addEventListener("mousedown", e=>{
         id: nextWallId++,
         x1: wallDraftStart.x,
         y1: wallDraftStart.y,
-        x2: world.x,
-        y2: world.y,
+        x2: snapped.x,
+        y2: snapped.y,
         style
       });
 
       wallDraftStart = null;
       markDirty();
+      setToolMode("select"); // single action
       draw();
     }
     return;
   }
 
-  // TOOL: LABEL
+  // TOOL: LABEL (single-use)
   if (toolMode === "label") {
-    const world = canvasToRoom(px, py);
     const text = prompt("Label text:", "");
     if (text && text.trim() !== "") {
       labels.push({
@@ -737,19 +838,22 @@ canvas.addEventListener("mousedown", e=>{
       markDirty();
       draw();
     }
+    setToolMode("select");
     return;
   }
 
-  // TOOL: SELECT / ITEMS
+  // TOOL: SELECT
+  // 1) Items
   const hit=getHit(px,py);
-
   if(hit){
     selectedItemId=hit.item.id;
+    selectedWallId=null;
+    selectedLabelId=null;
     updateSidebar();
 
     if(hit.mode==="move"){
       isDragging=true; dragItemId=hit.item.id;
-      const rp=canvasToRoom(px,py);
+      const rp=world;
       dragOffset.x=rp.x-hit.item.x;
       dragOffset.y=rp.y-hit.item.y;
     }
@@ -762,16 +866,60 @@ canvas.addEventListener("mousedown", e=>{
     }
 
     draw();
-  } else {
-    selectedItemId=null;
-    updateSidebar();
-    draw();
+    return;
   }
+
+  // 2) Walls
+  const wallHit = hitTestWall(px, py);
+  if (wallHit) {
+    selectedWallId = wallHit.wall.id;
+    selectedItemId = null;
+    selectedLabelId = null;
+    updateSidebar(); // will show "no item selected"
+    wallDragMode = wallHit.mode;
+    wallDragData = {
+      wallId: wallHit.wall.id,
+      startWorld: world,
+      orig: {
+        x1: wallHit.wall.x1,
+        y1: wallHit.wall.y1,
+        x2: wallHit.wall.x2,
+        y2: wallHit.wall.y2
+      }
+    };
+    draw();
+    return;
+  }
+
+  // 3) Labels
+  const labelHit = hitTestLabel(px, py);
+  if (labelHit) {
+    selectedLabelId = labelHit.id;
+    selectedItemId = null;
+    selectedWallId = null;
+    updateSidebar();
+    labelDragId = labelHit.id;
+    labelDragOffset.x = world.x - labelHit.x;
+    labelDragOffset.y = world.y - labelHit.y;
+    draw();
+    return;
+  }
+
+  // Nothing hit
+  selectedItemId=null;
+  selectedWallId=null;
+  selectedLabelId=null;
+  wallDragMode = null;
+  wallDragData = null;
+  labelDragId = null;
+  updateSidebar();
+  draw();
 });
 
 canvas.addEventListener("mousemove", e=>{
   const rect=canvas.getBoundingClientRect();
   const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  const world = canvasToRoom(px, py);
 
   // Panning with right mouse
   if (isPanning) {
@@ -785,11 +933,11 @@ canvas.addEventListener("mousemove", e=>{
     return;
   }
 
+  // Dragging items
   if(isDragging && dragItemId){
     const item=items.find(i=>i.id===dragItemId);
-    const rp=canvasToRoom(px,py);
-    item.x=rp.x-dragOffset.x;
-    item.y=rp.y-dragOffset.y;
+    item.x=world.x-dragOffset.x;
+    item.y=world.y-dragOffset.y;
 
     clampItemInsideRoom(item);
     markDirty();
@@ -797,6 +945,7 @@ canvas.addEventListener("mousemove", e=>{
     updateSidebar();
   }
 
+  // Rotating items
   if(isRotating && rotateItemId){
     const item=items.find(i=>i.id===rotateItemId);
     if (item.type !== "rect") return;
@@ -811,6 +960,48 @@ canvas.addEventListener("mousemove", e=>{
     draw();
     updateSidebar();
   }
+
+  // Dragging walls
+  if (wallDragMode && wallDragData) {
+    const wall = walls.find(w => w.id === wallDragData.wallId);
+    if (!wall) return;
+
+    if (wallDragMode === "line") {
+      const dx = world.x - wallDragData.startWorld.x;
+      const dy = world.y - wallDragData.startWorld.y;
+
+      let nx1 = wallDragData.orig.x1 + dx;
+      let ny1 = wallDragData.orig.y1 + dy;
+      let nx2 = wallDragData.orig.x2 + dx;
+      let ny2 = wallDragData.orig.y2 + dy;
+
+      // snap endpoints to grid
+      wall.x1 = snapToGrid(nx1);
+      wall.y1 = snapToGrid(ny1);
+      wall.x2 = snapToGrid(nx2);
+      wall.y2 = snapToGrid(ny2);
+    } else if (wallDragMode === "end1") {
+      wall.x1 = snapToGrid(world.x);
+      wall.y1 = snapToGrid(world.y);
+    } else if (wallDragMode === "end2") {
+      wall.x2 = snapToGrid(world.x);
+      wall.y2 = snapToGrid(world.y);
+    }
+
+    markDirty();
+    draw();
+  }
+
+  // Dragging labels
+  if (labelDragId) {
+    const label = labels.find(l => l.id === labelDragId);
+    if (label) {
+      label.x = world.x - labelDragOffset.x;
+      label.y = world.y - labelDragOffset.y;
+      markDirty();
+      draw();
+    }
+  }
 });
 
 window.addEventListener("mouseup", e=>{
@@ -821,6 +1012,9 @@ window.addEventListener("mouseup", e=>{
   if (e.button === 2) {
     isPanning = false;
   }
+  wallDragMode = null;
+  wallDragData = null;
+  labelDragId = null;
 });
 
 /* ===== MOUSE WHEEL ZOOM ===== */
@@ -893,9 +1087,6 @@ document.getElementById("addItemBtn").addEventListener("click", ()=>{
   const d=parseFloat(document.getElementById("itemDepth").value);
   if(!(w>0 && d>0)) return alert("Invalid rectangle size.");
 
-  const colorInput = document.querySelector('input[name="rectColor"]:checked');
-  const color = colorInput ? colorInput.value : "blue";
-
   const item={
     id:nextItemId++,
     type:"rect",
@@ -905,11 +1096,13 @@ document.getElementById("addItemBtn").addEventListener("click", ()=>{
     x:room.width/2,
     y:room.height/2,
     rotation:0,
-    color
+    color:"blue"
   };
   clampItemInsideRoom(item);
   items.push(item);
   selectedItemId=item.id;
+  selectedWallId=null;
+  selectedLabelId=null;
   markDirty();
 
   draw(); updateSidebar();
@@ -921,9 +1114,6 @@ document.getElementById("addCircleBtn").addEventListener("click", ()=>{
   const dia=parseFloat(document.getElementById("circleDiameter").value);
   if(!(dia>0)) return alert("Invalid circle diameter.");
 
-  const colorInput = document.querySelector('input[name="circleColor"]:checked');
-  const color = colorInput ? colorInput.value : "blue";
-
   const item={
     id:nextItemId++,
     type:"circle",
@@ -932,11 +1122,13 @@ document.getElementById("addCircleBtn").addEventListener("click", ()=>{
     x:room.width/2,
     y:room.height/2,
     rotation:0,
-    color
+    color:"blue"
   };
   clampItemInsideRoom(item);
   items.push(item);
   selectedItemId=item.id;
+  selectedWallId=null;
+  selectedLabelId=null;
   markDirty();
 
   draw(); updateSidebar();
@@ -978,6 +1170,12 @@ function updateSidebar(){
     circleFields.style.display="block";
     document.getElementById("editDiameter").value=item.diameter;
   }
+
+  // Set color radios
+  const colorRadios = document.querySelectorAll('input[name="editColor"]');
+  colorRadios.forEach(r => {
+    r.checked = (r.value === (item.color || "blue"));
+  });
 }
 
 document.getElementById("applyEditBtn").addEventListener("click", ()=>{
@@ -1003,6 +1201,12 @@ document.getElementById("applyEditBtn").addEventListener("click", ()=>{
     let dia=parseFloat(document.getElementById("editDiameter").value);
     if(!(dia>0)) dia=item.diameter;
     item.diameter=dia;
+  }
+
+  // apply color
+  const colorInput = document.querySelector('input[name="editColor"]:checked');
+  if (colorInput) {
+    item.color = colorInput.value;
   }
 
   clampItemInsideRoom(item);
@@ -1088,6 +1292,8 @@ document.getElementById("fileInput").addEventListener("change", e=>{
     offsetY = 0;
     items.forEach(clampItemInsideRoom);
     selectedItemId=null;
+    selectedWallId=null;
+    selectedLabelId=null;
     markClean();
     draw(); 
     updateSidebar();
