@@ -1,0 +1,2283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Shop Layout Planner</title>
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #f5f5f5;
+  }
+
+  header {
+    padding: 8px 12px;
+    background: #333;
+    color: #fff;
+    font-size: 18px;
+  }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    background: #fafafa;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .row-left {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .row-right {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-start;
+    text-align: left;
+    align-items: center;
+  }
+
+  button, input, select {
+    border-radius: 4px;
+    border: 1px solid #888;
+    padding: 4px 6px;
+    font-size: 14px;
+  }
+  button:hover { background: #eee; }
+
+  button.active {
+    background: #ddd;
+    border-color: #555;
+  }
+
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+  }
+
+  #canvasContainer {
+    flex: 1;
+    min-width: 300px;
+    border-right: 1px solid #ccc;
+    background: #fff;
+    display: flex;
+    position: relative;
+  }
+
+  #layoutCanvas {
+    flex: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+    outline: none;
+  }
+
+  #sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: #f9f9f9;
+    border-left: 1px solid #ccc;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #sidebar h3 {
+    font-size: 16px;
+    margin: 0 0 6px 0;
+  }
+
+  #sidebar input[type="text"],
+  #sidebar input[type="number"] {
+    width: 100%;
+    padding: 4px;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+
+  #sidebar button {
+    width: 100%;
+    padding: 6px;
+    margin-top: 4px;
+    font-size: 13px;
+  }
+
+  #sidebar .danger {
+    border-color: #b00;
+    color: #b00;
+  }
+
+  .hint {
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #444;
+    border-top: 1px solid #ddd;
+    background: #fafafa;
+  }
+
+  @media print {
+    header, .controls, #sidebar, .hint {
+      display: none !important;
+    }
+    #canvasContainer {
+      border: none;
+    }
+    #layoutCanvas {
+      width: auto !important;
+      height: auto !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>Shop Layout Planner</header>
+
+<div class="controls">
+  <!-- Row 1: Room + Rect -->
+  <div class="controls-row">
+    <div class="row-left">
+      <label>Room W:</label>
+      <input type="number" id="roomWidth" value="10" step="any">
+      <label>H:</label>
+      <input type="number" id="roomHeight" value="10" step="any">
+      <select id="roomUnits">
+        <option value="ft" selected>Feet</option>
+        <option value="m">Meters</option>
+      </select>
+      <button id="applyRoomBtn">Apply Room</button>
+    </div>
+
+    <div class="row-right">
+      <label>Rect:</label>
+      <input type="text" id="itemName" placeholder="Label" size="10">
+      <label>W:</label>
+      <input type="number" id="itemWidth" value="3" step="any">
+      <label>D:</label>
+      <input type="number" id="itemDepth" value="2" step="any">
+      <button id="addItemBtn">Add Rect</button>
+    </div>
+  </div>
+
+  <!-- Row 2: Save/Load/PDF + Circle -->
+  <div class="controls-row">
+    <div class="row-left">
+      <button id="downloadBtn">Download JSON</button>
+      <button id="uploadBtn">Upload JSON</button>
+      <input type="file" id="fileInput" accept="application/json" style="display:none;">
+      <label>PDF Header:</label>
+      <input type="text" id="pdfHeader" value="Shop Layout">
+      <button id="pdfBtn">Save PDF</button>
+    </div>
+
+    <div class="row-right">
+      <label>Circle:</label>
+      <input type="text" id="circleName" placeholder="Label" size="10">
+      <label>Dia:</label>
+      <input type="number" id="circleDiameter" value="2" step="any">
+      <button id="addCircleBtn">Add Circle</button>
+    </div>
+  </div>
+
+  <!-- Row 3: Tools -->
+  <div class="controls-row">
+    <div class="row-left">
+      <label>Tool:</label>
+      <button id="toolSelectBtn" class="active">Select / Items</button>
+      <button id="toolWallBtn">Add Wall</button>
+      <button id="toolDoorBtn">Add Door</button>
+      <button id="toolWindowBtn">Add Window</button>
+      <button id="toolLabelBtn">Add Label</button>
+    </div>
+    <div class="row-right">
+      <label>Wall Type:</label>
+      <label><input type="radio" name="wallType" value="interior" checked>Interior</label>
+      <label><input type="radio" name="wallType" value="exterior">Exterior</label>
+    </div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="canvasContainer">
+    <canvas id="layoutCanvas" tabindex="0"></canvas>
+  </div>
+
+  <div id="sidebar">
+    <h3 id="sidebarTitle">Nothing Selected</h3>
+
+    <div id="noSelection"><p>No item, wall, door, window, or label selected.</p></div>
+
+    <!-- Item editor (rect & circle) -->
+    <div id="itemEditor" style="display:none;">
+      <label>Name:</label>
+      <input type="text" id="editName">
+
+      <div id="rectFields">
+        <label>Width:</label>
+        <input type="number" id="editWidth" step="any">
+        <label>Depth:</label>
+        <input type="number" id="editDepth" step="any">
+        <label>Rotation (deg):</label>
+        <input type="number" id="editRotation" step="any">
+      </div>
+
+      <div id="circleFields" style="display:none;">
+        <label>Diameter:</label>
+        <input type="number" id="editDiameter" step="any">
+      </div>
+
+      <div id="colorFields">
+        <label>Color:</label><br>
+        <label><input type="radio" name="editColor" value="blue" checked>Blue</label>
+        <label><input type="radio" name="editColor" value="green">Green</label>
+        <label><input type="radio" name="editColor" value="orange">Orange</label>
+        <label><input type="radio" name="editColor" value="gray">Gray</label>
+      </div>
+
+      <button id="applyEditBtn">Apply Changes</button>
+      <button id="deleteItemBtn" class="danger">Delete Item</button>
+    </div>
+
+    <!-- Wall editor -->
+    <div id="wallEditor" style="display:none;">
+      <label>Wall Type:</label><br>
+      <label><input type="radio" name="wallEditType" value="interior"> Interior</label><br>
+      <label><input type="radio" name="wallEditType" value="exterior"> Exterior</label><br><br>
+
+      <button id="applyWallEditBtn">Apply Changes</button>
+      <button id="deleteWallBtn" class="danger">Delete Wall</button>
+    </div>
+
+    <!-- Door editor -->
+    <div id="doorEditor" style="display:none;">
+      <label>Door Width:</label>
+      <input type="number" id="editDoorWidth" step="any">
+
+      <label>Swing:</label><br>
+      <label><input type="radio" name="doorSwing" value="none" checked> None</label><br>
+      <label><input type="radio" name="doorSwing" value="in-left"> Inward – Left</label><br>
+      <label><input type="radio" name="doorSwing" value="in-right"> Inward – Right</label><br>
+      <label><input type="radio" name="doorSwing" value="out-left"> Outward – Left</label><br>
+      <label><input type="radio" name="doorSwing" value="out-right"> Outward – Right</label><br><br>
+
+      <button id="applyDoorEditBtn">Apply Changes</button>
+      <button id="deleteDoorBtn" class="danger">Delete Door</button>
+    </div>
+
+    <!-- Window editor -->
+    <div id="windowEditor" style="display:none;">
+      <label>Window Width:</label>
+      <input type="number" id="editWindowWidth" step="any">
+
+      <button id="applyWindowEditBtn">Apply Changes</button>
+      <button id="deleteWindowBtn" class="danger">Delete Window</button>
+    </div>
+
+    <!-- Label editor -->
+    <div id="labelEditor" style="display:none;">
+      <label>Text:</label>
+      <input type="text" id="editLabelText">
+
+      <label>Size:</label><br>
+      <label><input type="radio" name="labelSize" value="small"> Small</label><br>
+      <label><input type="radio" name="labelSize" value="medium" checked> Medium</label><br>
+      <label><input type="radio" name="labelSize" value="large"> Large</label><br><br>
+
+      <label>Color:</label><br>
+      <label><input type="radio" name="labelColor" value="black" checked> Black</label><br>
+      <label><input type="radio" name="labelColor" value="gray"> Gray</label><br>
+      <label><input type="radio" name="labelColor" value="blue"> Blue</label><br><br>
+
+      <button id="applyLabelEditBtn">Apply Changes</button>
+      <button id="deleteLabelBtn" class="danger">Delete Label</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="hint">
+  Rectangles & circles: click to select, drag to move, use [ and ] to rotate rectangles.  
+  Walls: choose "Add Wall", click start (snaps), move mouse to see preview, click end (snaps). One wall per use of the tool.  
+  Doors & windows: choose "Add Door" or "Add Window", then click near a wall to place. Drag along the wall; edit in sidebar.  
+  Labels: choose "Add Label" and click to place; drag to move and edit in sidebar.  
+  Right-click + drag = pan. Mouse wheel = zoom. PDF always shows the full room (including dimensions).
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+/* ---------- Core Data ---------- */
+const canvas = document.getElementById("layoutCanvas");
+const ctx = canvas.getContext("2d");
+
+let room = { width: 10, height: 10, units: "ft" };
+let baseScale = 10;
+const padding = 30;
+
+let items = [];
+let walls = [];
+let labels = [];
+let doors = [];
+let windowsArr = [];
+
+let nextItemId = 1;
+let nextWallId = 1;
+let nextLabelId = 1;
+let nextDoorId = 1;
+let nextWindowId = 1;
+
+let selectedItemId = null;
+let selectedWallId = null;
+let selectedLabelId = null;
+let selectedDoorId = null;
+let selectedWindowId = null;
+
+let isDragging = false;
+let dragItemId = null;
+let dragOffset = { x:0, y:0 };
+
+let isRotating = false;
+let rotateItemId = null;
+let rotateStartAngle = 0;
+let rotateStartMouseAngle = 0;
+
+let wallDragMode = null;
+let wallDragData = null;
+
+let labelDragId = null;
+let labelDragOffset = { x: 0, y: 0 };
+
+let doorDragId = null;
+let doorDragData = null;
+
+let windowDragId = null;
+let windowDragData = null;
+
+let isDirty = false;
+
+let viewScale = 1;
+let offsetX = 0;
+let offsetY = 0;
+let isPanning = false;
+let panLastX = 0;
+let panLastY = 0;
+
+let toolMode = "select";
+let wallDraftStart = null;
+let wallPreviewCurrent = null;
+
+/* ---------- Dirty flag & unload warning ---------- */
+function markDirty() { isDirty = true; }
+function markClean() { isDirty = false; }
+
+window.addEventListener("beforeunload", (e) => {
+  if (!isDirty) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+
+/* ---------- Helpers ---------- */
+
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+function getMinorGridStep() {
+  return room.units === "m" ? 0.1 : 0.25;
+}
+function getMajorGridStep() {
+  return room.units === "m" ? 0.5 : 1.0;
+}
+function snapToGridValue(v) {
+  const step = getMinorGridStep();
+  return Math.round(v / step) * step;
+}
+
+function resizeCanvas() {
+  const rect = document.getElementById("canvasContainer").getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  computeBaseScale();
+  draw();
+}
+
+function computeBaseScale() {
+  const usableW = canvas.width - padding*2;
+  const usableH = canvas.height - padding*2;
+  baseScale = Math.min(usableW / room.width, usableH / room.height);
+}
+
+function effectiveScale() {
+  return baseScale * viewScale;
+}
+
+function roomToCanvas(x,y){
+  const s = effectiveScale();
+  return {
+    x: padding + offsetX + x * s,
+    y: padding + offsetY + y * s
+  };
+}
+function canvasToRoom(x,y){
+  const s = effectiveScale();
+  return {
+    x: (x - padding - offsetX) / s,
+    y: (y - padding - offsetY) / s
+  };
+}
+
+/* ---------- Items & Colors ---------- */
+
+function getItemBounds(item) {
+  if (item.type === "circle") {
+    const r = item.diameter / 2;
+    return { halfW: r, halfH: r };
+  } else {
+    const w = item.width;
+    const d = item.depth;
+    const a = item.rotation || 0;
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    const halfW = 0.5 * (Math.abs(w * cos) + Math.abs(d * sin));
+    const halfH = 0.5 * (Math.abs(w * sin) + Math.abs(d * cos));
+    return { halfW, halfH };
+  }
+}
+
+function getItemFillColor(color) {
+  switch (color) {
+    case "green":  return "#d6f5d6";
+    case "orange": return "#ffe0b3";
+    case "gray":   return "#e0e0e0";
+    case "blue":
+    default:       return "#d5e8ff";
+  }
+}
+function getItemStrokeColor(color) {
+  switch (color) {
+    case "green":  return "#3c7a3c";
+    case "orange": return "#b36b00";
+    case "gray":   return "#555555";
+    case "blue":
+    default:       return "#555555";
+  }
+}
+
+function getLabelFont(label) {
+  switch (label.size) {
+    case "small": return "12px system-ui";
+    case "large": return "20px system-ui";
+    case "medium":
+    default: return "14px system-ui";
+  }
+}
+
+/* ---------- Drawing ---------- */
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawRoom(ctx, roomToCanvas, effectiveScale());
+  drawGrid(ctx, roomToCanvas);
+  drawWalls(ctx, roomToCanvas);
+  drawItems(ctx, roomToCanvas);
+  drawLabels(ctx, roomToCanvas);
+  drawDimensions(ctx, roomToCanvas);
+  drawWallPreview(ctx, roomToCanvas);
+}
+
+function drawRoom(ctxLocal, roomToCanvasFn, effScale){
+  const tl = roomToCanvasFn(0,0);
+  const br = roomToCanvasFn(room.width,room.height);
+  ctxLocal.strokeStyle="#000";
+  ctxLocal.lineWidth=2;
+  ctxLocal.strokeRect(tl.x,tl.y,br.x-tl.x,br.y-tl.y);
+}
+
+function drawGrid(ctxLocal, roomToCanvasFn){
+  const major = getMajorGridStep();
+  const minor = getMinorGridStep();
+  ctxLocal.save();
+
+  ctxLocal.strokeStyle="#eee";
+  ctxLocal.beginPath();
+  for(let x=0; x<=room.width+1e-6; x+=minor){
+    const p1=roomToCanvasFn(x,0), p2=roomToCanvasFn(x,room.height);
+    ctxLocal.moveTo(p1.x,p1.y); ctxLocal.lineTo(p2.x,p2.y);
+  }
+  for(let y=0; y<=room.height+1e-6; y+=minor){
+    const p1=roomToCanvasFn(0,y), p2=roomToCanvasFn(room.width,y);
+    ctxLocal.moveTo(p1.x,p1.y); ctxLocal.lineTo(p2.x,p2.y);
+  }
+  ctxLocal.stroke();
+
+  ctxLocal.strokeStyle="#ccc";
+  ctxLocal.beginPath();
+  for(let x=0; x<=room.width+1e-6; x+=major){
+    const p1=roomToCanvasFn(x,0), p2=roomToCanvasFn(x,room.height);
+    ctxLocal.moveTo(p1.x,p1.y); ctxLocal.lineTo(p2.x,p2.y);
+  }
+  for(let y=0; y<=room.height+1e-6; y+=major){
+    const p1=roomToCanvasFn(0,y), p2=roomToCanvasFn(room.width,y);
+    ctxLocal.moveTo(p1.x,p1.y); ctxLocal.lineTo(p2.x,p2.y);
+  }
+  ctxLocal.stroke();
+
+  ctxLocal.restore();
+}
+
+/* ----- Walls (with door & window openings) ----- */
+
+function drawWalls(ctxLocal, roomToCanvasFn) {
+  walls.forEach(wall => {
+    const wallDoors = doors.filter(d => d.wallId === wall.id);
+    const wallWindows = windowsArr.filter(w => w.wallId === wall.id);
+    drawWallWithOpenings(ctxLocal, roomToCanvasFn, wall, wallDoors, wallWindows);
+  });
+}
+
+function drawWallWithOpenings(ctxLocal, roomToCanvasFn, wall, wallDoors, wallWindows) {
+  const p1World = {x: wall.x1, y: wall.y1};
+  const p2World = {x: wall.x2, y: wall.y2};
+  const dx = p2World.x - p1World.x;
+  const dy = p2World.y - p1World.y;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return;
+
+  // Collect openings from doors and windows
+  const openings = [];
+
+  wallDoors.forEach(door => {
+    const halfFrac = (door.width / len) / 2;
+    let s = door.offset - halfFrac;
+    let e = door.offset + halfFrac;
+    s = Math.max(0, Math.min(1, s));
+    e = Math.max(0, Math.min(1, e));
+    if (e > s) {
+      openings.push({ start: s, end: e, type: "door", ref: door });
+    }
+  });
+
+  wallWindows.forEach(win => {
+    const halfFrac = (win.width / len) / 2;
+    let s = win.offset - halfFrac;
+    let e = win.offset + halfFrac;
+    s = Math.max(0, Math.min(1, s));
+    e = Math.max(0, Math.min(1, e));
+    if (e > s) {
+      openings.push({ start: s, end: e, type: "window", ref: win });
+    }
+  });
+
+  openings.sort((a,b) => a.start - b.start);
+
+  let segments = [];
+  let cur = 0;
+  openings.forEach(op => {
+    if (op.start > cur) {
+      segments.push({ start: cur, end: op.start });
+    }
+    cur = Math.max(cur, op.end);
+  });
+  if (cur < 1) segments.push({ start: cur, end: 1 });
+
+  const isSelected = (wall.id === selectedWallId);
+  const scaleFactor = Math.sqrt(viewScale);
+  let baseInterior = 2;
+  let baseExterior = 4;
+  let lineWidth;
+
+  if (wall.style === "exterior") {
+    ctxLocal.strokeStyle = isSelected ? "#ff0000" : "#000000";
+    lineWidth = baseExterior * scaleFactor;
+    if (isSelected) lineWidth *= 1.3;
+  } else {
+    ctxLocal.strokeStyle = isSelected ? "#ff0000" : "#666666";
+    lineWidth = baseInterior * scaleFactor;
+    if (isSelected) lineWidth *= 1.3;
+  }
+  ctxLocal.lineWidth = lineWidth;
+
+  // Draw wall segments (with gaps where doors/windows are)
+  segments.forEach(seg => {
+    const s1 = seg.start;
+    const s2 = seg.end;
+    const wx1 = p1World.x + dx * s1;
+    const wy1 = p1World.y + dy * s1;
+    const wx2 = p1World.x + dx * s2;
+    const wy2 = p1World.y + dy * s2;
+    const c1 = roomToCanvasFn(wx1, wy1);
+    const c2 = roomToCanvasFn(wx2, wy2);
+    ctxLocal.beginPath();
+    ctxLocal.moveTo(c1.x, c1.y);
+    ctxLocal.lineTo(c2.x, c2.y);
+    ctxLocal.stroke();
+  });
+
+  // Endpoints for selected wall
+  if (isSelected) {
+    const cp1 = roomToCanvasFn(wall.x1, wall.y1);
+    const cp2 = roomToCanvasFn(wall.x2, wall.y2);
+    ctxLocal.fillStyle = "#ffffff";
+    ctxLocal.strokeStyle = "#ff0000";
+    ctxLocal.lineWidth = 2;
+    [cp1, cp2].forEach(pt => {
+      ctxLocal.beginPath();
+      ctxLocal.arc(pt.x, pt.y, 6, 0, Math.PI*2);
+      ctxLocal.fill();
+      ctxLocal.stroke();
+    });
+  }
+
+  // Draw doors and windows on top
+  wallDoors.forEach(door => {
+    drawDoorSymbol(ctxLocal, roomToCanvasFn, wall, door);
+  });
+  wallWindows.forEach(win => {
+    drawWindowSymbol(ctxLocal, roomToCanvasFn, wall, win);
+  });
+}
+
+/* ----- Door drawing (thin line + arc, full width) ----- */
+
+function drawDoorSymbol(ctxLocal, roomToCanvasFn, wall, door) {
+  if (door.swing === "none") return;
+
+  const x1 = wall.x1, y1 = wall.y1;
+  const x2 = wall.x2, y2 = wall.y2;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return;
+
+  const halfFrac = (door.width / len) / 2;
+  let s = door.offset - halfFrac;
+  let e = door.offset + halfFrac;
+  s = Math.max(0, Math.min(1, s));
+  e = Math.max(0, Math.min(1, e));
+  if (e <= s) return;
+
+  const startX = x1 + dx * s;
+  const startY = y1 + dy * s;
+  const endX   = x1 + dx * e;
+  const endY   = y1 + dy * e;
+
+  let hingeX, hingeY, leafX, leafY;
+  if (door.swing.endsWith("left")) {
+    hingeX = startX;
+    hingeY = startY;
+    leafX  = endX;
+    leafY  = endY;
+  } else {
+    hingeX = endX;
+    hingeY = endY;
+    leafX  = startX;
+    leafY  = startY;
+  }
+
+  const hingeCanvas = roomToCanvasFn(hingeX, hingeY);
+  const leafCanvas  = roomToCanvasFn(leafX, leafY);
+  const leafRadius  = Math.hypot(leafCanvas.x - hingeCanvas.x, leafCanvas.y - hingeCanvas.y);
+
+  const baseAngle = Math.atan2(leafCanvas.y - hingeCanvas.y, leafCanvas.x - hingeCanvas.x);
+  const sweep = Math.PI / 2;
+  let direction = 1;
+  if (door.swing === "in-left" || door.swing === "out-right") {
+    direction = 1;
+  } else if (door.swing === "in-right" || door.swing === "out-left") {
+    direction = -1;
+  }
+
+  const startAngle = baseAngle;
+  const endAngle   = baseAngle + direction * sweep;
+
+  ctxLocal.save();
+  ctxLocal.strokeStyle = "#444";
+  ctxLocal.lineWidth = 1.4;
+
+  // door leaf
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(hingeCanvas.x, hingeCanvas.y);
+  ctxLocal.lineTo(leafCanvas.x, leafCanvas.y);
+  ctxLocal.stroke();
+
+  // swing arc
+  ctxLocal.beginPath();
+  ctxLocal.arc(
+    hingeCanvas.x,
+    hingeCanvas.y,
+    leafRadius,
+    startAngle,
+    endAngle,
+    direction < 0
+  );
+  ctxLocal.stroke();
+
+  ctxLocal.restore();
+}
+
+/* ----- Window drawing ----- */
+
+function drawWindowSymbol(ctxLocal, roomToCanvasFn, wall, win) {
+  const x1 = wall.x1, y1 = wall.y1;
+  const x2 = wall.x2, y2 = wall.y2;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return;
+
+  const centerX = x1 + dx * win.offset;
+  const centerY = y1 + dy * win.offset;
+
+  const wx = win.width;
+  const s = effectiveScale();
+  const half = (wx * s) / 2;
+
+  const wallAngle = Math.atan2(dy, dx);
+
+  const centerCanvas = roomToCanvasFn(centerX, centerY);
+
+  ctxLocal.save();
+  ctxLocal.translate(centerCanvas.x, centerCanvas.y);
+  ctxLocal.rotate(wallAngle);
+
+  const h = 6; // window thickness in screen px
+  ctxLocal.fillStyle = "#cce6ff";
+  ctxLocal.strokeStyle = (win.id === selectedWindowId ? "#0066cc" : "#004488");
+  ctxLocal.lineWidth = 1.5;
+
+  ctxLocal.beginPath();
+  ctxLocal.rect(-half, -h/2, wx * s, h);
+  ctxLocal.fill();
+  ctxLocal.stroke();
+
+  ctxLocal.restore();
+}
+
+/* ----- Items (rect & circle) ----- */
+
+function drawItems(ctxLocal, roomToCanvasFn){
+  items.forEach(item => drawItem(ctxLocal, roomToCanvasFn, item));
+}
+
+function drawItem(ctxLocal, roomToCanvasFn, item){
+  if (item.type === "circle") {
+    drawCircleItem(ctxLocal, roomToCanvasFn, item);
+  } else {
+    drawRectItem(ctxLocal, roomToCanvasFn, item);
+  }
+}
+
+function drawRectItem(ctxLocal, roomToCanvasFn, item){
+  const c = roomToCanvasFn(item.x,item.y);
+  const s = effectiveScale();
+  const w = item.width * s;
+  const h = item.depth * s;
+
+  const fillCol = getItemFillColor(item.color);
+  const strokeCol = getItemStrokeColor(item.color);
+
+  ctxLocal.save();
+  ctxLocal.translate(c.x,c.y);
+  ctxLocal.rotate(item.rotation || 0);
+
+  ctxLocal.fillStyle = fillCol;
+  ctxLocal.strokeStyle = (item.id===selectedItemId ? "#06c" : strokeCol);
+  ctxLocal.lineWidth = (item.id===selectedItemId ? 2 : 1.2);
+
+  ctxLocal.fillRect(-w/2,-h/2,w,h);
+  ctxLocal.strokeRect(-w/2,-h/2,w,h);
+
+  ctxLocal.save();
+  ctxLocal.rotate(-(item.rotation || 0));
+  ctxLocal.fillStyle="#000";
+  ctxLocal.font="13px system-ui";
+  ctxLocal.textAlign="center";
+  ctxLocal.textBaseline="middle";
+  ctxLocal.fillText(item.name,0,0);
+  ctxLocal.restore();
+
+  ctxLocal.restore();
+
+  if(item.id===selectedItemId) drawRotateHandle(ctxLocal, roomToCanvasFn, item);
+}
+
+function drawCircleItem(ctxLocal, roomToCanvasFn, item){
+  const c = roomToCanvasFn(item.x,item.y);
+  const s = effectiveScale();
+  const r = (item.diameter/2) * s;
+
+  const fillCol = getItemFillColor(item.color);
+  const strokeCol = getItemStrokeColor(item.color);
+
+  ctxLocal.save();
+  ctxLocal.beginPath();
+  ctxLocal.arc(c.x, c.y, r, 0, Math.PI*2);
+  ctxLocal.fillStyle = fillCol;
+  ctxLocal.fill();
+  ctxLocal.strokeStyle = (item.id===selectedItemId ? "#06c" : strokeCol);
+  ctxLocal.lineWidth = (item.id===selectedItemId ? 2 : 1.2);
+  ctxLocal.stroke();
+
+  ctxLocal.fillStyle="#000";
+  ctxLocal.font="13px system-ui";
+  ctxLocal.textAlign="center";
+  ctxLocal.textBaseline="middle";
+  ctxLocal.fillText(item.name, c.x, c.y);
+  ctxLocal.restore();
+}
+
+/* ----- Labels ----- */
+
+function drawLabels(ctxLocal, roomToCanvasFn) {
+  ctxLocal.save();
+  ctxLocal.textAlign = "center";
+  ctxLocal.textBaseline = "middle";
+
+  labels.forEach(label => {
+    const p = roomToCanvasFn(label.x, label.y);
+    ctxLocal.font = getLabelFont(label);
+    ctxLocal.fillStyle = label.color || "#444";
+    ctxLocal.fillText(label.text, p.x, p.y);
+
+    if (label.id === selectedLabelId) {
+      const paddingPx = 4;
+      const textWidth = ctxLocal.measureText(label.text).width;
+      const boxW = textWidth + paddingPx*2;
+      const boxH = 20;
+      ctxLocal.strokeStyle = "#ff0000";
+      ctxLocal.lineWidth = 1;
+      ctxLocal.strokeRect(p.x - boxW/2, p.y - boxH/2, boxW, boxH);
+    }
+  });
+
+  ctxLocal.restore();
+}
+
+/* ----- Dimensions (room) ----- */
+
+function drawDimensions(ctxLocal, roomToCanvasFn) {
+  ctxLocal.save();
+  ctxLocal.strokeStyle = "#999";
+  ctxLocal.fillStyle = "#555";
+  ctxLocal.lineWidth = 1;
+  ctxLocal.font = "12px system-ui";
+  ctxLocal.textAlign = "center";
+  ctxLocal.textBaseline = "middle";
+
+  const tl = roomToCanvasFn(0,0);
+  const tr = roomToCanvasFn(room.width,0);
+  const bl = roomToCanvasFn(0,room.height);
+
+  const yOff = tl.y - 20;
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(tl.x, yOff);
+  ctxLocal.lineTo(tr.x, yOff);
+  ctxLocal.stroke();
+
+  const arrowSize = 5;
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(tl.x, yOff);
+  ctxLocal.lineTo(tl.x + arrowSize, yOff - arrowSize);
+  ctxLocal.moveTo(tl.x, yOff);
+  ctxLocal.lineTo(tl.x + arrowSize, yOff + arrowSize);
+
+  ctxLocal.moveTo(tr.x, yOff);
+  ctxLocal.lineTo(tr.x - arrowSize, yOff - arrowSize);
+  ctxLocal.moveTo(tr.x, yOff);
+  ctxLocal.lineTo(tr.x - arrowSize, yOff + arrowSize);
+  ctxLocal.stroke();
+
+  const widthText = room.width.toFixed(2) + " " + room.units;
+  ctxLocal.fillText(widthText, (tl.x + tr.x) / 2, yOff - 10);
+
+  const xOff = tl.x - 20;
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(xOff, tl.y);
+  ctxLocal.lineTo(xOff, bl.y);
+  ctxLocal.stroke();
+
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(xOff, tl.y);
+  ctxLocal.lineTo(xOff - arrowSize, tl.y + arrowSize);
+  ctxLocal.moveTo(xOff, tl.y);
+  ctxLocal.lineTo(xOff + arrowSize, tl.y + arrowSize);
+
+  ctxLocal.moveTo(xOff, bl.y);
+  ctxLocal.lineTo(xOff - arrowSize, bl.y - arrowSize);
+  ctxLocal.moveTo(xOff, bl.y);
+  ctxLocal.lineTo(xOff + arrowSize, bl.y - arrowSize);
+  ctxLocal.stroke();
+
+  const heightText = room.height.toFixed(2) + " " + room.units;
+  ctxLocal.save();
+  ctxLocal.translate(xOff - 15, (tl.y + bl.y) / 2);
+  ctxLocal.rotate(-Math.PI/2);
+  ctxLocal.fillText(heightText, 0, 0);
+  ctxLocal.restore();
+
+  ctxLocal.restore();
+}
+
+/* ----- Wall preview while drawing ----- */
+
+function drawWallPreview(ctxLocal, roomToCanvasFn) {
+  if (!wallDraftStart || !wallPreviewCurrent) return;
+
+  const p1 = roomToCanvasFn(wallDraftStart.x, wallDraftStart.y);
+  const p2 = roomToCanvasFn(wallPreviewCurrent.x, wallPreviewCurrent.y);
+
+  ctxLocal.save();
+  ctxLocal.strokeStyle = "rgba(0,0,0,0.5)";
+  ctxLocal.setLineDash([5,4]);
+  ctxLocal.lineWidth = 1;
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(p1.x, p1.y);
+  ctxLocal.lineTo(p2.x, p2.y);
+  ctxLocal.stroke();
+  ctxLocal.setLineDash([]);
+  ctxLocal.restore();
+}
+
+/* ----- Rotate handle for rectangles ----- */
+
+function drawRotateHandle(ctxLocal, roomToCanvasFn, item){
+  if (item.type !== "rect") return;
+
+  const c=roomToCanvasFn(item.x,item.y);
+  const s = effectiveScale();
+  const h=item.depth * s;
+  const half=h/2, offset=20;
+  const L=half+offset;
+  const a = item.rotation || 0;
+
+  const hx=c.x + L*Math.sin(a);
+  const hy=c.y - L*Math.cos(a);
+
+  ctxLocal.save();
+  ctxLocal.fillStyle="#fff";
+  ctxLocal.strokeStyle="#06c";
+  ctxLocal.lineWidth=2;
+
+  ctxLocal.beginPath();
+  ctxLocal.arc(hx,hy,7,0,Math.PI*2);
+  ctxLocal.fill();
+  ctxLocal.stroke();
+
+  ctxLocal.beginPath();
+  ctxLocal.moveTo(c.x,c.y);
+  ctxLocal.lineTo(hx,hy);
+  ctxLocal.stroke();
+
+  ctxLocal.restore();
+}
+
+/* ---------- Hit Testing ---------- */
+
+function getHit(px,py){
+  for(let i=items.length-1;i>=0;i--){
+    const item=items[i];
+    if (item.type === "rect" && isRotateHandle(px,py,item)) {
+      return {item,mode:"rotate"};
+    }
+    if (isInsideItem(px,py,item)) {
+      return {item,mode:"move"};
+    }
+  }
+  return null;
+}
+
+function isInsideItem(px,py,item){
+  if (item.type === "circle") {
+    const c = roomToCanvas(item.x,item.y);
+    const s = effectiveScale();
+    const r = (item.diameter/2) * s;
+    return Math.hypot(px - c.x, py - c.y) <= r;
+  } else {
+    const c = roomToCanvas(item.x,item.y);
+    let dx=px-c.x, dy=py-c.y;
+    const a = item.rotation || 0;
+    const cos=Math.cos(-a), sin=Math.sin(-a);
+    let x=dx*cos - dy*sin;
+    let y=dx*sin + dy*cos;
+    const s = effectiveScale();
+    const hw=item.width*s/2, hh=item.depth*s/2;
+    return (x>=-hw && x<=hw && y>=-hh && y<=hh);
+  }
+}
+
+function isRotateHandle(px,py,item){
+  if (item.type !== "rect") return false;
+  const c=roomToCanvas(item.x,item.y);
+  const s = effectiveScale();
+  const h=item.depth*s;
+  const half=h/2, offset=20;
+  const L=half+offset;
+  const a = item.rotation || 0;
+
+  const hx=c.x + L*Math.sin(a);
+  const hy=c.y - L*Math.cos(a);
+
+  return Math.hypot(px-hx,py-hy)<=10;
+}
+
+/* ----- Wall intersection helpers ----- */
+
+function segmentIntersectionWorld(w1, w2) {
+  const x1 = w1.x1, y1 = w1.y1;
+  const x2 = w1.x2, y2 = w1.y2;
+  const x3 = w2.x1, y3 = w2.y1;
+  const x4 = w2.x2, y4 = w2.y2;
+
+  const denom = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4);
+  if (Math.abs(denom) < 1e-9) return null;
+
+  const t = ((x1-x3)*(y3-y4) - (y1-y3)*(x3-x4)) / denom;
+  const u = ((x1-x3)*(y1-y2) - (y1-y3)*(x1-x2)) / denom;
+
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+
+  return {
+    x: x1 + t*(x2-x1),
+    y: y1 + t*(y2-y1)
+  };
+}
+
+/* ----- Snapping: grid + endpoints + intersections ----- */
+
+function getSnappedPoint(world, px, py, mode) {
+  const gridPoint = {
+    x: snapToGridValue(world.x),
+    y: snapToGridValue(world.y)
+  };
+
+  if (mode !== "wall" && mode !== "wallEnd") {
+    return gridPoint;
+  }
+
+  const snapRadiusPx = 12;
+  let bestPoint = null;
+  let bestDist = Infinity;
+
+  function considerCandidate(cx, cy) {
+    const cc = roomToCanvas(cx, cy);
+    const dist = Math.hypot(cc.x - px, cc.y - py);
+    if (dist < snapRadiusPx && dist < bestDist) {
+      bestDist = dist;
+      bestPoint = { x: cx, y: cy };
+    }
+  }
+
+  // Endpoints
+  walls.forEach(w => {
+    considerCandidate(w.x1, w.y1);
+    considerCandidate(w.x2, w.y2);
+  });
+
+  // Intersections
+  const n = walls.length;
+  for (let i=0;i<n;i++){
+    for (let j=i+1;j<n;j++){
+      const p = segmentIntersectionWorld(walls[i], walls[j]);
+      if (p){
+        considerCandidate(p.x, p.y);
+      }
+    }
+  }
+
+  if (!bestPoint) return gridPoint;
+  return bestPoint;
+}
+
+/* ----- Hit tests: walls, doors, windows, labels ----- */
+
+function hitTestWall(px, py) {
+  const endRadius = 10;
+  const lineThreshold = 6;
+
+  for (let i = walls.length - 1; i >= 0; i--) {
+    const wall = walls[i];
+    const p1 = roomToCanvas(wall.x1, wall.y1);
+    const p2 = roomToCanvas(wall.x2, wall.y2);
+
+    const d1 = Math.hypot(px - p1.x, py - p1.y);
+    if (d1 <= endRadius) {
+      return { wall, mode: "end1" };
+    }
+    const d2 = Math.hypot(px - p2.x, py - p2.y);
+    if (d2 <= endRadius) {
+      return { wall, mode: "end2" };
+    }
+
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len2 = dx*dx + dy*dy;
+    if (len2 === 0) continue;
+    let t = ((px - p1.x)*dx + (py - p1.y)*dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const projX = p1.x + t*dx;
+    const projY = p1.y + t*dy;
+    const distLine = Math.hypot(px - projX, py - projY);
+    if (distLine <= lineThreshold) {
+      return { wall, mode: "line" };
+    }
+  }
+  return null;
+}
+
+function hitTestDoor(px, py) {
+  const radius = 16; // bigger for easier selection
+
+  for (let i = doors.length - 1; i >= 0; i--) {
+    const door = doors[i];
+    const wall = walls.find(w => w.id === door.wallId);
+    if (!wall) continue;
+
+    const x1 = wall.x1, y1 = wall.y1;
+    const x2 = wall.x2, y2 = wall.y2;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+
+    const centerX = x1 + dx * door.offset;
+    const centerY = y1 + dy * door.offset;
+    const c = roomToCanvas(centerX, centerY);
+
+    // distance to center
+    if (Math.hypot(px - c.x, py - c.y) <= radius) return door;
+  }
+  return null;
+}
+
+function hitTestWindow(px, py) {
+  const radius = 16;
+
+  for (let i = windowsArr.length - 1; i >= 0; i--) {
+    const win = windowsArr[i];
+    const wall = walls.find(w => w.id === win.wallId);
+    if (!wall) continue;
+
+    const x1 = wall.x1, y1 = wall.y1;
+    const x2 = wall.x2, y2 = wall.y2;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+
+    const centerX = x1 + dx * win.offset;
+    const centerY = y1 + dy * win.offset;
+    const c = roomToCanvas(centerX, centerY);
+
+    if (Math.hypot(px - c.x, py - c.y) <= radius) return win;
+  }
+  return null;
+}
+
+function hitTestLabel(px, py) {
+  const radius = 10;
+  for (let i = labels.length - 1; i >= 0; i--) {
+    const label = labels[i];
+    const p = roomToCanvas(label.x, label.y);
+    if (Math.hypot(px - p.x, py - p.y) <= radius) {
+      return label;
+    }
+  }
+  return null;
+}
+
+/* ---------- Tool Buttons ---------- */
+
+const toolSelectBtn = document.getElementById("toolSelectBtn");
+const toolWallBtn = document.getElementById("toolWallBtn");
+const toolDoorBtn = document.getElementById("toolDoorBtn");
+const toolWindowBtn = document.getElementById("toolWindowBtn");
+const toolLabelBtn = document.getElementById("toolLabelBtn");
+
+function setToolMode(mode) {
+  toolMode = mode;
+  wallDraftStart = null;
+  wallPreviewCurrent = null;
+
+  toolSelectBtn.classList.remove("active");
+  toolWallBtn.classList.remove("active");
+  toolDoorBtn.classList.remove("active");
+  toolWindowBtn.classList.remove("active");
+  toolLabelBtn.classList.remove("active");
+
+  if (mode === "select") toolSelectBtn.classList.add("active");
+  if (mode === "wall")   toolWallBtn.classList.add("active");
+  if (mode === "door")   toolDoorBtn.classList.add("active");
+  if (mode === "window") toolWindowBtn.classList.add("active");
+  if (mode === "label")  toolLabelBtn.classList.add("active");
+}
+
+toolSelectBtn.addEventListener("click", () => setToolMode("select"));
+toolWallBtn.addEventListener("click", () => setToolMode("wall"));
+toolDoorBtn.addEventListener("click", () => setToolMode("door"));
+toolWindowBtn.addEventListener("click", () => setToolMode("window"));
+toolLabelBtn.addEventListener("click", () => setToolMode("label"));
+
+/* ---------- Mouse Events ---------- */
+
+canvas.addEventListener("mousedown", e=>{
+  const rect=canvas.getBoundingClientRect();
+  const px=e.clientX-rect.left, py=e.clientY-rect.top;
+
+  if (e.button === 2) {
+    isPanning = true;
+    panLastX = e.clientX;
+    panLastY = e.clientY;
+    return;
+  }
+  if (e.button !== 0) return;
+
+  const world = canvasToRoom(px, py);
+
+  /* Wall tool */
+  if (toolMode === "wall") {
+    const snapped = getSnappedPoint(world, px, py, "wall");
+    if (!wallDraftStart) {
+      wallDraftStart = snapped;
+      wallPreviewCurrent = snapped;
+    } else {
+      const wallTypeInput = document.querySelector('input[name="wallType"]:checked');
+      const style = wallTypeInput ? wallTypeInput.value : "interior";
+
+      walls.push({
+        id: nextWallId++,
+        x1: wallDraftStart.x,
+        y1: wallDraftStart.y,
+        x2: snapped.x,
+        y2: snapped.y,
+        style,
+        isPerimeter: false
+      });
+
+      wallDraftStart = null;
+      wallPreviewCurrent = null;
+      markDirty();
+      setToolMode("select");
+      draw();
+    }
+    return;
+  }
+
+  /* Door tool */
+  if (toolMode === "door") {
+    let nearestWall = null;
+    let nearestDist = Infinity;
+    let nearestT = 0;
+
+    walls.forEach(w => {
+      const p1 = roomToCanvas(w.x1, w.y1);
+      const p2 = roomToCanvas(w.x2, w.y2);
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const len2 = dx*dx + dy*dy;
+      if (len2 === 0) return;
+      let t = ((px - p1.x)*dx + (py - p1.y)*dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const projX = p1.x + t*dx;
+      const projY = p1.y + t*dy;
+      const dist = Math.hypot(px - projX, py - projY);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestWall = w;
+        nearestT = t;
+      }
+    });
+
+    if (!nearestWall || nearestDist > 20) {
+      alert("Click closer to a wall to place a door.");
+      return;
+    }
+
+    const wallLen = Math.hypot(nearestWall.x2 - nearestWall.x1, nearestWall.y2 - nearestWall.y1);
+    const defaultWidth = Math.min(3, wallLen);
+
+    const door = {
+      id: nextDoorId++,
+      wallId: nearestWall.id,
+      offset: nearestT,
+      width: defaultWidth,
+      swing: "none"
+    };
+    doors.push(door);
+    selectedDoorId = door.id;
+    selectedItemId = null;
+    selectedWallId = null;
+    selectedLabelId = null;
+    selectedWindowId = null;
+    markDirty();
+    setToolMode("select");
+    draw();
+    updateSidebar();
+    return;
+  }
+
+  /* Window tool */
+  if (toolMode === "window") {
+    let nearestWall = null;
+    let nearestDist = Infinity;
+    let nearestT = 0;
+
+    walls.forEach(w => {
+      const p1 = roomToCanvas(w.x1, w.y1);
+      const p2 = roomToCanvas(w.x2, w.y2);
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const len2 = dx*dx + dy*dy;
+      if (len2 === 0) return;
+      let t = ((px - p1.x)*dx + (py - p1.y)*dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const projX = p1.x + t*dx;
+      const projY = p1.y + t*dy;
+      const dist = Math.hypot(px - projX, py - projY);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestWall = w;
+        nearestT = t;
+      }
+    });
+
+    if (!nearestWall || nearestDist > 20) {
+      alert("Click closer to a wall to place a window.");
+      return;
+    }
+
+    const wallLen = Math.hypot(nearestWall.x2 - nearestWall.x1, nearestWall.y2 - nearestWall.y1);
+    const defaultWidth = Math.min(3, wallLen);
+
+    const win = {
+      id: nextWindowId++,
+      wallId: nearestWall.id,
+      offset: nearestT,
+      width: defaultWidth
+    };
+    windowsArr.push(win);
+    selectedWindowId = win.id;
+    selectedDoorId = null;
+    selectedItemId = null;
+    selectedWallId = null;
+    selectedLabelId = null;
+    markDirty();
+    setToolMode("select");
+    draw();
+    updateSidebar();
+    return;
+  }
+
+  /* Label tool */
+  if (toolMode === "label") {
+    const text = prompt("Label text:", "Label");
+    if (text && text.trim() !== "") {
+      labels.push({
+        id: nextLabelId++,
+        text: text.trim(),
+        x: world.x,
+        y: world.y,
+        size: "medium",
+        color: "black"
+      });
+      markDirty();
+      draw();
+    }
+    setToolMode("select");
+    return;
+  }
+
+  /* Select / drag mode */
+  const hit=getHit(px,py);
+  if(hit){
+    selectedItemId=hit.item.id;
+    selectedWallId=null;
+    selectedDoorId=null;
+    selectedLabelId=null;
+    selectedWindowId=null;
+    updateSidebar();
+
+    if(hit.mode==="move"){
+      isDragging=true; dragItemId=hit.item.id;
+      const rp=world;
+      dragOffset.x=rp.x-hit.item.x;
+      dragOffset.y=rp.y-hit.item.y;
+    }
+
+    if(hit.mode==="rotate"){
+      isRotating=true; rotateItemId=hit.item.id;
+      const c=roomToCanvas(hit.item.x,hit.item.y);
+      rotateStartMouseAngle=Math.atan2(py-c.y, px-c.x);
+      rotateStartAngle=hit.item.rotation || 0;
+    }
+
+    draw();
+    return;
+  }
+
+  const doorHit = hitTestDoor(px, py);
+  if (doorHit) {
+    selectedDoorId = doorHit.id;
+    selectedItemId = null;
+    selectedWallId = null;
+    selectedLabelId = null;
+    selectedWindowId = null;
+    updateSidebar();
+
+    doorDragId = doorHit.id;
+    doorDragData = { };
+    draw();
+    return;
+  }
+
+  const windowHit = hitTestWindow(px, py);
+  if (windowHit) {
+    selectedWindowId = windowHit.id;
+    selectedDoorId = null;
+    selectedItemId = null;
+    selectedWallId = null;
+    selectedLabelId = null;
+    updateSidebar();
+
+    windowDragId = windowHit.id;
+    windowDragData = {};
+    draw();
+    return;
+  }
+
+  const wallHit = hitTestWall(px, py);
+  if (wallHit) {
+    selectedWallId = wallHit.wall.id;
+    selectedItemId = null;
+    selectedDoorId = null;
+    selectedLabelId = null;
+    selectedWindowId = null;
+    updateSidebar();
+    wallDragMode = wallHit.mode;
+    wallDragData = {
+      wallId: wallHit.wall.id,
+      startWorld: world,
+      orig: {
+        x1: wallHit.wall.x1,
+        y1: wallHit.wall.y1,
+        x2: wallHit.wall.x2,
+        y2: wallHit.wall.y2
+      }
+    };
+    draw();
+    return;
+  }
+
+  const labelHit = hitTestLabel(px, py);
+  if (labelHit) {
+    selectedLabelId = labelHit.id;
+    selectedItemId = null;
+    selectedWallId = null;
+    selectedDoorId = null;
+    selectedWindowId = null;
+    updateSidebar();
+    labelDragId = labelHit.id;
+    labelDragOffset.x = world.x - labelHit.x;
+    labelDragOffset.y = world.y - labelHit.y;
+    draw();
+    return;
+  }
+
+  selectedItemId=null;
+  selectedWallId=null;
+  selectedDoorId=null;
+  selectedLabelId=null;
+  selectedWindowId=null;
+  wallDragMode = null;
+  wallDragData = null;
+  labelDragId = null;
+  doorDragId = null;
+  doorDragData = null;
+  windowDragId = null;
+  windowDragData = null;
+  updateSidebar();
+  draw();
+});
+
+canvas.addEventListener("mousemove", e=>{
+  const rect=canvas.getBoundingClientRect();
+  const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  const world = canvasToRoom(px, py);
+
+  if (isPanning) {
+    const dx = e.clientX - panLastX;
+    const dy = e.clientY - panLastY;
+    panLastX = e.clientX;
+    panLastY = e.clientY;
+    offsetX += dx;
+    offsetY += dy;
+    draw();
+    return;
+  }
+
+  if (toolMode === "wall" && wallDraftStart) {
+    const snapped = getSnappedPoint(world, px, py, "wall");
+    wallPreviewCurrent = snapped;
+    draw();
+    return;
+  }
+
+  if(isDragging && dragItemId){
+    const item=items.find(i=>i.id===dragItemId);
+    item.x=world.x-dragOffset.x;
+    item.y=world.y-dragOffset.y;
+    markDirty();
+    draw();
+    updateSidebar();
+  }
+
+  if(isRotating && rotateItemId){
+    const item=items.find(i=>i.id===rotateItemId);
+    if (item.type !== "rect") return;
+
+    const c=roomToCanvas(item.x,item.y);
+    const ang=Math.atan2(py-c.y, px-c.x);
+    item.rotation=rotateStartAngle + (ang-rotateStartMouseAngle);
+    snapRotation(item);
+    markDirty();
+
+    draw();
+    updateSidebar();
+  }
+
+  if (wallDragMode && wallDragData) {
+    const wall = walls.find(w => w.id === wallDragData.wallId);
+    if (!wall) return;
+
+    if (wallDragMode === "line") {
+      const snappedWorld = getSnappedPoint(world, px, py, "wall");
+      const dx = snappedWorld.x - wallDragData.startWorld.x;
+      const dy = snappedWorld.y - wallDragData.startWorld.y;
+
+      wall.x1 = wallDragData.orig.x1 + dx;
+      wall.y1 = wallDragData.orig.y1 + dy;
+      wall.x2 = wallDragData.orig.x2 + dx;
+      wall.y2 = wallDragData.orig.y2 + dy;
+    } else if (wallDragMode === "end1") {
+      const snapped = getSnappedPoint(world, px, py, "wallEnd");
+      wall.x1 = snapped.x;
+      wall.y1 = snapped.y;
+    } else if (wallDragMode === "end2") {
+      const snapped = getSnappedPoint(world, px, py, "wallEnd");
+      wall.x2 = snapped.x;
+      wall.y2 = snapped.y;
+    }
+
+    markDirty();
+    draw();
+  }
+
+  if (labelDragId) {
+    const label = labels.find(l => l.id === labelDragId);
+    if (label) {
+      label.x = world.x - labelDragOffset.x;
+      label.y = world.y - labelDragOffset.y;
+      markDirty();
+      draw();
+    }
+  }
+
+  if (doorDragId) {
+    const door = doors.find(d => d.id === doorDragId);
+    if (!door) return;
+    const wall = walls.find(w => w.id === door.wallId);
+    if (!wall) return;
+
+    const p1 = roomToCanvas(wall.x1, wall.y1);
+    const p2 = roomToCanvas(wall.x2, wall.y2);
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len2 = dx*dx + dy*dy;
+    if (len2 === 0) return;
+
+    let t = ((px - p1.x)*dx + (py - p1.y)*dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+
+    door.offset = t;
+    markDirty();
+    draw();
+    updateSidebar();
+  }
+
+  if (windowDragId) {
+    const win = windowsArr.find(w => w.id === windowDragId);
+    if (!win) return;
+    const wall = walls.find(w => w.id === win.wallId);
+    if (!wall) return;
+
+    const p1 = roomToCanvas(wall.x1, wall.y1);
+    const p2 = roomToCanvas(wall.x2, wall.y2);
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len2 = dx*dx + dy*dy;
+    if (len2 === 0) return;
+
+    let t = ((px - p1.x)*dx + (py - p1.y)*dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+
+    win.offset = t;
+    markDirty();
+    draw();
+    updateSidebar();
+  }
+});
+
+window.addEventListener("mouseup", e=>{
+  isDragging=false;
+  dragItemId=null;
+  isRotating=false;
+  rotateItemId=null;
+  if (e.button === 2) {
+    isPanning = false;
+  }
+  wallDragMode = null;
+  wallDragData = null;
+  labelDragId = null;
+  doorDragId = null;
+  doorDragData = null;
+  windowDragId = null;
+  windowDragData = null;
+});
+
+/* ---------- Zoom (with slightly more zoom-out) ---------- */
+
+canvas.addEventListener("wheel", (e)=>{
+  e.preventDefault();
+
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+
+  const world = canvasToRoom(px, py);
+
+  const factor = (e.deltaY < 0 ? 1.05 : 0.95);
+  let newViewScale = viewScale * factor;
+  const minViewScale = 0.9; // ~10% smaller than base
+  const maxViewScale = 6;
+  newViewScale = Math.max(minViewScale, Math.min(maxViewScale, newViewScale));
+  viewScale = newViewScale;
+
+  const s = effectiveScale();
+  offsetX = px - padding - world.x * s;
+  offsetY = py - padding - world.y * s;
+
+  draw();
+}, { passive: false });
+
+/* ---------- Rotation snapping for rectangles ---------- */
+
+function snapRotation(item){
+  const targets=[0,90,180,270].map(d=>d*Math.PI/180);
+  let a=(item.rotation || 0)%(2*Math.PI);
+  if(a<0)a+=2*Math.PI;
+
+  let best=a, min=999;
+  for(let t of targets){
+    let diff=Math.abs(a-t);
+    diff=Math.min(diff,2*Math.PI-diff);
+    if(diff<min){min=diff; best=t;}
+  }
+
+  if(min < 5*Math.PI/180) item.rotation=best;
+}
+
+document.addEventListener("keydown", e=>{
+  if(!selectedItemId)return;
+  const item=items.find(i=>i.id===selectedItemId);
+  if (!item || item.type !== "rect") return;
+
+  const step=5*Math.PI/180;
+  if(e.key==="[") item.rotation = (item.rotation || 0) - step;
+  if(e.key==="]") item.rotation = (item.rotation || 0) + step;
+
+  snapRotation(item);
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+/* ---------- Add Items ---------- */
+
+document.getElementById("addItemBtn").addEventListener("click", ()=>{
+  const name=(document.getElementById("itemName").value || "Label");
+  const w=parseFloat(document.getElementById("itemWidth").value);
+  const d=parseFloat(document.getElementById("itemDepth").value);
+  if(!(w>0 && d>0)) return alert("Invalid rectangle size.");
+
+  const item={
+    id:nextItemId++,
+    type:"rect",
+    name,
+    width:w,
+    depth:d,
+    x:room.width/2,
+    y:room.height/2,
+    rotation:0,
+    color:"blue"
+  };
+  items.push(item);
+  selectedItemId=item.id;
+  selectedWallId=null;
+  selectedLabelId=null;
+  selectedDoorId=null;
+  selectedWindowId=null;
+  markDirty();
+
+  draw(); updateSidebar();
+});
+
+document.getElementById("addCircleBtn").addEventListener("click", ()=>{
+  const name=(document.getElementById("circleName").value || "Label");
+  const dia=parseFloat(document.getElementById("circleDiameter").value);
+  if(!(dia>0)) return alert("Invalid circle diameter.");
+
+  const item={
+    id:nextItemId++,
+    type:"circle",
+    name,
+    diameter:dia,
+    x:room.width/2,
+    y:room.height/2,
+    rotation:0,
+    color:"blue"
+  };
+  items.push(item);
+  selectedItemId=item.id;
+  selectedWallId=null;
+  selectedLabelId=null;
+  selectedDoorId=null;
+  selectedWindowId=null;
+  markDirty();
+
+  draw(); updateSidebar();
+});
+
+/* ---------- Sidebar Updates ---------- */
+
+function updateSidebar() {
+  const sidebarTitle = document.getElementById("sidebarTitle");
+  const noSel   = document.getElementById("noSelection");
+  const itemEd  = document.getElementById("itemEditor");
+  const wallEd  = document.getElementById("wallEditor");
+  const doorEd  = document.getElementById("doorEditor");
+  const windowEd  = document.getElementById("windowEditor");
+  const labelEd = document.getElementById("labelEditor");
+  const rectFields = document.getElementById("rectFields");
+  const circleFields = document.getElementById("circleFields");
+
+  noSel.style.display   = "block";
+  itemEd.style.display  = "none";
+  wallEd.style.display  = "none";
+  doorEd.style.display  = "none";
+  windowEd.style.display = "none";
+  labelEd.style.display = "none";
+  sidebarTitle.textContent = "Nothing Selected";
+
+  if (selectedItemId) {
+    const item = items.find(i => i.id === selectedItemId);
+    if (!item) return;
+
+    noSel.style.display = "none";
+    itemEd.style.display = "block";
+    sidebarTitle.textContent = "Item Details";
+
+    document.getElementById("editName").value = item.name;
+
+    if (item.type === "rect") {
+      rectFields.style.display = "block";
+      circleFields.style.display = "none";
+      document.getElementById("editWidth").value = item.width;
+      document.getElementById("editDepth").value = item.depth;
+      document.getElementById("editRotation").value = ((item.rotation||0)*180/Math.PI).toFixed(2);
+    } else {
+      rectFields.style.display = "none";
+      circleFields.style.display = "block";
+      document.getElementById("editDiameter").value = item.diameter;
+    }
+
+    const radios = document.querySelectorAll('input[name="editColor"]');
+    radios.forEach(r => r.checked = (r.value === item.color));
+
+    return;
+  }
+
+  if (selectedWallId) {
+    const wall = walls.find(w => w.id === selectedWallId);
+    if (!wall) return;
+
+    noSel.style.display = "none";
+    wallEd.style.display = "block";
+    sidebarTitle.textContent = "Wall Details";
+
+    const typeRadios = document.querySelectorAll('input[name="wallEditType"]');
+    typeRadios.forEach(r => r.checked = (r.value === wall.style));
+
+    return;
+  }
+
+  if (selectedDoorId) {
+    const door = doors.find(d => d.id === selectedDoorId);
+    if (!door) return;
+
+    noSel.style.display = "none";
+    doorEd.style.display = "block";
+    sidebarTitle.textContent = "Door Details";
+
+    document.getElementById("editDoorWidth").value = door.width;
+
+    document.querySelectorAll("input[name='doorSwing']").forEach(r => {
+      r.checked = (r.value === (door.swing || "none"));
+    });
+
+    return;
+  }
+
+  if (selectedWindowId) {
+    const win = windowsArr.find(w => w.id === selectedWindowId);
+    if (!win) return;
+
+    noSel.style.display = "none";
+    windowEd.style.display = "block";
+    sidebarTitle.textContent = "Window Details";
+
+    document.getElementById("editWindowWidth").value = win.width;
+
+    return;
+  }
+
+  if (selectedLabelId) {
+    const label = labels.find(l => l.id === selectedLabelId);
+    if (!label) return;
+
+    noSel.style.display = "none";
+    labelEd.style.display = "block";
+    sidebarTitle.textContent = "Label Details";
+
+    document.getElementById("editLabelText").value = label.text;
+
+    document.querySelectorAll("input[name='labelSize']").forEach(r => {
+      r.checked = (r.value === (label.size || "medium"));
+    });
+
+    document.querySelectorAll("input[name='labelColor']").forEach(r => {
+      r.checked = (r.value === (label.color || "black"));
+    });
+
+    return;
+  }
+}
+
+/* ----- Item sidebar actions ----- */
+
+document.getElementById("applyEditBtn").addEventListener("click", ()=>{
+  const item=items.find(i=>i.id===selectedItemId);
+  if(!item)return;
+
+  item.name=document.getElementById("editName").value || "Label";
+
+  if (item.type === "rect") {
+    let w=parseFloat(document.getElementById("editWidth").value);
+    let d=parseFloat(document.getElementById("editDepth").value);
+    if(!(w>0)) w=item.width;
+    if(!(d>0)) d=item.depth;
+    item.width=w;
+    item.depth=d;
+
+    let rDeg=parseFloat(document.getElementById("editRotation").value);
+    if(!isNaN(rDeg)){
+      item.rotation=rDeg*Math.PI/180;
+      snapRotation(item);
+    }
+  } else {
+    let dia=parseFloat(document.getElementById("editDiameter").value);
+    if(!(dia>0)) dia=item.diameter;
+    item.diameter=dia;
+  }
+
+  const colorInput = document.querySelector('input[name="editColor"]:checked');
+  if (colorInput) {
+    item.color = colorInput.value;
+  }
+
+  markDirty();
+  draw(); 
+  updateSidebar();
+});
+
+document.getElementById("deleteItemBtn").addEventListener("click", ()=>{
+  items=items.filter(i=>i.id!==selectedItemId);
+  selectedItemId=null;
+  markDirty();
+  draw(); updateSidebar();
+});
+
+/* ----- Wall sidebar actions ----- */
+
+document.getElementById("applyWallEditBtn").addEventListener("click", ()=>{
+  const wall = walls.find(w => w.id === selectedWallId);
+  if (!wall) return;
+
+  const r = document.querySelector('input[name="wallEditType"]:checked');
+  if (r) wall.style = r.value || "interior";
+
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+document.getElementById("deleteWallBtn").addEventListener("click", ()=>{
+  const wallId = selectedWallId;
+  walls = walls.filter(w => w.id !== wallId);
+  doors = doors.filter(d => d.wallId !== wallId);
+  windowsArr = windowsArr.filter(win => win.wallId !== wallId);
+  selectedWallId = null;
+  selectedDoorId = null;
+  selectedWindowId = null;
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+/* ----- Door sidebar actions ----- */
+
+document.getElementById("applyDoorEditBtn").addEventListener("click", ()=>{
+  const door = doors.find(d => d.id === selectedDoorId);
+  if (!door) return;
+
+  let w = parseFloat(document.getElementById("editDoorWidth").value);
+  if (!(w > 0)) {
+    w = door.width;
+  }
+  door.width = w;
+
+  const swingRadio = document.querySelector("input[name='doorSwing']:checked");
+  if (swingRadio) {
+    door.swing = swingRadio.value;
+  }
+
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+document.getElementById("deleteDoorBtn").addEventListener("click", ()=>{
+  doors = doors.filter(d => d.id !== selectedDoorId);
+  selectedDoorId = null;
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+/* ----- Window sidebar actions ----- */
+
+document.getElementById("applyWindowEditBtn").addEventListener("click", ()=>{
+  const win = windowsArr.find(w => w.id === selectedWindowId);
+  if (!win) return;
+
+  let w = parseFloat(document.getElementById("editWindowWidth").value);
+  if (!(w > 0)) w = win.width;
+  win.width = w;
+
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+document.getElementById("deleteWindowBtn").addEventListener("click", ()=>{
+  windowsArr = windowsArr.filter(w => w.id !== selectedWindowId);
+  selectedWindowId = null;
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+/* ----- Label sidebar actions ----- */
+
+document.getElementById("applyLabelEditBtn").addEventListener("click", ()=>{
+  const label = labels.find(l => l.id === selectedLabelId);
+  if (!label) return;
+
+  label.text = document.getElementById("editLabelText").value || "Label";
+
+  const s = document.querySelector("input[name='labelSize']:checked");
+  if (s) label.size = s.value;
+
+  const c = document.querySelector("input[name='labelColor']:checked");
+  if (c) label.color = c.value;
+
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+document.getElementById("deleteLabelBtn").addEventListener("click", ()=>{
+  labels = labels.filter(l => l.id !== selectedLabelId);
+  selectedLabelId = null;
+  markDirty();
+  draw();
+  updateSidebar();
+});
+
+/* ---------- Room & Perimeter Walls ---------- */
+
+function ensurePerimeterWalls() {
+  if (walls.some(w => w.isPerimeter)) return;
+
+  const idBase = nextWallId;
+  const W = room.width;
+  const H = room.height;
+
+  walls.push(
+    { id: nextWallId++, x1:0, y1:0, x2:W, y2:0, style:"exterior", isPerimeter:true, side:"top" },
+    { id: nextWallId++, x1:W, y1:0, x2:W, y2:H, style:"exterior", isPerimeter:true, side:"right" },
+    { id: nextWallId++, x1:W, y1:H, x2:0, y2:H, style:"exterior", isPerimeter:true, side:"bottom" },
+    { id: nextWallId++, x1:0, y1:H, x2:0, y2:0, style:"exterior", isPerimeter:true, side:"left" }
+  );
+}
+
+function updatePerimeterWallGeometry() {
+  const W = room.width;
+  const H = room.height;
+
+  walls.forEach(w => {
+    if (!w.isPerimeter) return;
+    switch (w.side) {
+      case "top":
+        w.x1 = 0; w.y1 = 0;
+        w.x2 = W; w.y2 = 0;
+        break;
+      case "right":
+        w.x1 = W; w.y1 = 0;
+        w.x2 = W; w.y2 = H;
+        break;
+      case "bottom":
+        w.x1 = W; w.y1 = H;
+        w.x2 = 0; w.y2 = H;
+        break;
+      case "left":
+        w.x1 = 0; w.y1 = H;
+        w.x2 = 0; w.y2 = 0;
+        break;
+    }
+  });
+}
+
+document.getElementById("applyRoomBtn").addEventListener("click", ()=>{
+  const w=parseFloat(document.getElementById("roomWidth").value);
+  const h=parseFloat(document.getElementById("roomHeight").value);
+  if(!(w>0 && h>0)) return alert("Invalid room dimensions.");
+
+  room.width=w;
+  room.height=h;
+  room.units=document.getElementById("roomUnits").value;
+
+  updatePerimeterWallGeometry();
+  computeBaseScale();
+  markDirty();
+  draw();
+});
+
+/* ---------- JSON Save/Load ---------- */
+
+document.getElementById("downloadBtn").addEventListener("click", ()=>{
+  const blob=new Blob(
+    [JSON.stringify({
+      room,items,walls,labels,doors,windowsArr,
+      nextItemId,nextWallId,nextLabelId,nextDoorId,nextWindowId
+    },null,2)],
+    {type:"application/json"}
+  );
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download="shop_layout.json"; a.click();
+  URL.revokeObjectURL(url);
+  markClean();
+});
+
+const fileInput = document.getElementById("fileInput");
+
+document.getElementById("uploadBtn").addEventListener("click", ()=>fileInput.click());
+
+fileInput.addEventListener("change", e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+
+  const reader=new FileReader();
+  reader.onload=function(evt){
+    const obj=JSON.parse(evt.target.result);
+    room=obj.room;
+    items=obj.items || [];
+    walls=obj.walls || [];
+    labels=obj.labels || [];
+    doors = obj.doors || [];
+    windowsArr = obj.windowsArr || [];
+    nextItemId=obj.nextItemId || 1;
+    nextWallId=obj.nextWallId || 1;
+    nextLabelId=obj.nextLabelId || 1;
+    nextDoorId=obj.nextDoorId || 1;
+    nextWindowId=obj.nextWindowId || 1;
+
+    items.forEach(it=>{
+      if (!it.type) it.type="rect";
+      if (!it.color) it.color="blue";
+      if (it.type==="circle" && typeof it.diameter!=="number") {
+        it.type="rect";
+      }
+      if (it.type==="rect" && typeof it.rotation!=="number") {
+        it.rotation=0;
+      }
+    });
+
+    labels.forEach(l => {
+      if (!l.size) l.size = "medium";
+      if (!l.color) l.color = "black";
+    });
+
+    doors.forEach(d => {
+      if (!d.swing) d.swing = "none";
+      if (typeof d.width !== "number" || d.width <= 0) {
+        d.width = 3;
+      }
+      if (typeof d.offset !== "number") {
+        d.offset = 0.5;
+      }
+    });
+
+    windowsArr.forEach(w => {
+      if (typeof w.width !== "number" || w.width <= 0) w.width = 3;
+      if (typeof w.offset !== "number") w.offset = 0.5;
+    });
+
+    computeBaseScale();
+    selectedItemId=null;
+    selectedWallId=null;
+    selectedLabelId=null;
+    selectedDoorId=null;
+    selectedWindowId=null;
+    markClean();
+    draw(); 
+    updateSidebar();
+  };
+  reader.readAsText(file);
+  fileInput.value="";
+});
+
+/* ---------- PDF Export (includes dimensions) ---------- */
+
+document.getElementById("pdfBtn").addEventListener("click", ()=>{
+  const { jsPDF } = window.jspdf;
+  const headerText = document.getElementById("pdfHeader").value || "Shop Layout";
+
+  const pdfPageSize = "letter";
+  const pdf = new jsPDF({
+    orientation: room.width >= room.height ? "landscape" : "portrait",
+    unit: "pt",
+    format: pdfPageSize
+  });
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+
+  const headerSpace = 40;
+  const availableWidth = pageWidth - 40;
+  const availableHeight = pageHeight - headerSpace - 40;
+
+  const aspectRoom = room.width / room.height;
+  const aspectPage = availableWidth / availableHeight;
+
+  let drawWidth, drawHeight;
+  if (aspectRoom > aspectPage) {
+    drawWidth = availableWidth;
+    drawHeight = drawWidth / aspectRoom;
+  } else {
+    drawHeight = availableHeight;
+    drawWidth = drawHeight * aspectRoom;
+  }
+
+  const offCanvas = document.createElement("canvas");
+  offCanvas.width = Math.round(drawWidth);
+  offCanvas.height = Math.round(drawHeight);
+  const offCtx = offCanvas.getContext("2d");
+
+  const localPadding = 20;
+  const s = Math.min(
+    (offCanvas.width - 2*localPadding) / room.width,
+    (offCanvas.height - 2*localPadding) / room.height
+  );
+
+  function roomToCanvasPdf(x, y) {
+    return {
+      x: localPadding + x * s,
+      y: localPadding + y * s
+    };
+  }
+
+  offCtx.fillStyle = "#ffffff";
+  offCtx.fillRect(0,0,offCanvas.width,offCanvas.height);
+
+  drawRoom(offCtx, roomToCanvasPdf, s);
+  drawGrid(offCtx, roomToCanvasPdf);
+  drawWalls(offCtx, roomToCanvasPdf);
+
+  // Clip to room area for items/labels (so off-grid items don't show)
+  offCtx.save();
+  const tl = roomToCanvasPdf(0,0);
+  const br = roomToCanvasPdf(room.width, room.height);
+  offCtx.beginPath();
+  offCtx.rect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  offCtx.clip();
+
+  drawItems(offCtx, roomToCanvasPdf);
+  drawLabels(offCtx, roomToCanvasPdf);
+
+  offCtx.restore();
+
+  // Draw room dimensions on PDF
+  drawDimensions(offCtx, roomToCanvasPdf);
+
+  const dataUrl = offCanvas.toDataURL("image/png");
+
+  pdf.setFontSize(14);
+  const textWidth = pdf.getTextWidth(headerText);
+  const textX = (pageWidth - textWidth) / 2;
+  const textY = 24;
+  pdf.text(headerText, textX, textY);
+
+  const imageX = (pageWidth - drawWidth) / 2;
+  const imageY = headerSpace;
+  pdf.addImage(dataUrl, "PNG", imageX, imageY, drawWidth, drawHeight);
+
+  pdf.save("shop_layout.pdf");
+});
+
+/* ---------- Init ---------- */
+
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+ensurePerimeterWalls();
+updatePerimeterWallGeometry();
+draw();
+markClean();
+updateSidebar();
+</script>
+
+</body>
+</html>
