@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Dowel G-Code Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap');
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #21262d;
+      --border: #30363d;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted: #6e7681;
+      --accent: #58a6ff;
+      --accent-emphasis: #1f6feb;
+      --success: #3fb950;
+      --warning: #d29922;
+      --wood: #8B7355;
+      --wood-dark: #654321;
+      --wood-grain: #6d5a45;
+    }
+    
+    body { 
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    
+    .app {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    header h1 {
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.5px;
+    }
+    
+    header p {
+      color: var(--text-secondary);
+      margin-top: 8px;
+      font-size: 14px;
+    }
+    
+    .main-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 32px;
+    }
+    
+    @media (max-width: 1000px) {
+      .main-layout { grid-template-columns: 1fr; }
+    }
+    
+    .panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    
+    .panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-tertiary);
+    }
+    
+    .panel-header h2 {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+    }
+    
+    .panel-body {
+      padding: 20px;
+    }
+    
+    .input-section {
+      margin-bottom: 24px;
+    }
+    
+    .input-section:last-child {
+      margin-bottom: 0;
+    }
+    
+    .input-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .input-section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    
+    .input-group {
+      margin-bottom: 16px;
+    }
+    
+    .input-group:last-child {
+      margin-bottom: 0;
+    }
+    
+    .input-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    
+    .input-with-unit {
+      position: relative;
+    }
+    
+    .input-with-unit input {
+      padding-right: 45px;
+    }
+    
+    .input-unit {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+    }
+    
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    
+    .input-row-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+    
+    .collapsible-header {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      width: 100%;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.15s;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    
+    .collapsible-header:hover {
+      background: var(--border);
+      color: var(--text-primary);
+    }
+    
+    .collapsible-header .chevron {
+      transition: transform 0.2s;
+      font-size: 10px;
+    }
+    
+    .collapsible-header.open .chevron {
+      transform: rotate(180deg);
+    }
+    
+    .collapsible-content {
+      margin-top: 12px;
+      padding: 16px;
+      background: var(--bg-primary);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    
+    .generate-btn {
+      width: 100%;
+      padding: 14px 20px;
+      background: var(--accent-emphasis);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: 'Space Grotesk', sans-serif;
+      margin-top: 20px;
+    }
+    
+    .generate-btn:hover {
+      background: var(--accent);
+    }
+    
+    .generate-btn:active {
+      transform: scale(0.98);
+    }
+    
+    .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    
+    @media (max-width: 1200px) {
+      .preview-grid { grid-template-columns: 1fr; }
+    }
+    
+    .preview-box {
+      background: var(--bg-primary);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 280px;
+    }
+    
+    .preview-box h3 {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      align-self: flex-start;
+    }
+    
+    .preview-box svg {
+      flex: 1;
+      max-width: 100%;
+    }
+    
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+    
+    .info-card {
+      background: var(--bg-primary);
+      border-radius: 8px;
+      padding: 16px;
+      border-left: 3px solid var(--accent);
+    }
+    
+    .info-card.highlight {
+      border-left-color: var(--success);
+    }
+    
+    .info-card.warning {
+      border-left-color: var(--warning);
+    }
+    
+    .info-card-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    
+    .info-card-value {
+      font-size: 18px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-primary);
+    }
+    
+    .info-card-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    
+    .dim-line { stroke: var(--accent); stroke-width: 1; }
+    .dim-text { 
+      font-size: 11px; 
+      fill: var(--accent); 
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .stock-outline { 
+      fill: none; 
+      stroke: var(--text-muted); 
+      stroke-width: 2;
+      stroke-dasharray: 6 3;
+    }
+    .dowel-circle {
+      fill: var(--wood);
+      stroke: var(--wood-dark);
+      stroke-width: 1.5;
+    }
+    .tool-path {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 1;
+      stroke-dasharray: 4 2;
+      opacity: 0.6;
+    }
+    .origin-marker {
+      fill: var(--success);
+    }
+    .axis-label {
+      font-size: 10px;
+      fill: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // Default tool presets
+    const defaultTools = {
+      '0.125': { name: '1/8"', diameter: 0.125, rpm: 24000, feed: 30, stepdown: 0.006 },
+      '0.1875': { name: '3/16"', diameter: 0.1875, rpm: 20000, feed: 40, stepdown: 0.0085 },
+      '0.25': { name: '1/4"', diameter: 0.25, rpm: 18000, feed: 50, stepdown: 0.010 }
+    };
+
+    function MultiDowelGenerator() {
+      // Dowel parameters
+      const [dowelDiameter, setDowelDiameter] = useState('0.25');
+      const [dowelLength, setDowelLength] = useState('1.0');
+      
+      // Grid parameters
+      const [numColumns, setNumColumns] = useState('3');
+      const [numRows, setNumRows] = useState('2');
+      const [clearance, setClearance] = useState('0.1');
+      
+      // Tool parameters
+      const [selectedTool, setSelectedTool] = useState('0.1875');
+      const [showToolSettings, setShowToolSettings] = useState(false);
+      const [toolSettings, setToolSettings] = useState({...defaultTools});
+      const [toolNumber, setToolNumber] = useState('3');
+      const [safeZ, setSafeZ] = useState('0.6');
+
+      const currentTool = toolSettings[selectedTool];
+      
+      // Calculate all derived values
+      const calculations = useMemo(() => {
+        const dDia = parseFloat(dowelDiameter) || 0.25;
+        const dLen = parseFloat(dowelLength) || 1;
+        const tDia = currentTool.diameter;
+        const stepdown = currentTool.stepdown;
+        const cols = parseInt(numColumns) || 1;
+        const rows = parseInt(numRows) || 1;
+        const clr = parseFloat(clearance) || 0.1;
+        
+        // Tool center radius (where tool center orbits)
+        const toolCenterRadius = (dDia / 2) + (tDia / 2);
+        
+        // Outer sweep radius (furthest point of tool from dowel center)
+        const outerSweep = (dDia / 2) + tDia;
+        
+        // Spacing between dowel centers
+        const spacing = dDia + (2 * tDia) + clr;
+        
+        // Edge margin (from stock edge to first dowel center)
+        const edgeMargin = outerSweep + (clr / 2);
+        
+        // Minimum stock dimensions
+        const minStockX = (2 * edgeMargin) + ((cols - 1) * spacing);
+        const minStockY = (2 * edgeMargin) + ((rows - 1) * spacing);
+        
+        // Number of passes for cutting
+        const numPasses = Math.ceil(dLen / stepdown);
+        const actualStepdown = dLen / numPasses;
+        
+        // Total dowels
+        const totalDowels = cols * rows;
+        
+        // Generate dowel positions (zero at back-left top)
+        // X+ goes right, Y+ goes toward front
+        const dowelPositions = [];
+        for (let row = 0; row < rows; row++) {
+          for (let col = 0; col < cols; col++) {
+            dowelPositions.push({
+              x: edgeMargin + (col * spacing),
+              y: edgeMargin + (row * spacing),
+              index: row * cols + col + 1
+            });
+          }
+        }
+        
+        return {
+          toolCenterRadius,
+          outerSweep,
+          spacing,
+          edgeMargin,
+          minStockX,
+          minStockY,
+          numPasses,
+          actualStepdown,
+          totalDowels,
+          dowelPositions,
+          cols,
+          rows,
+          dDia,
+          dLen,
+          tDia
+        };
+      }, [dowelDiameter, dowelLength, currentTool, numColumns, numRows, clearance]);
+
+      const updateToolSetting = (key, value) => {
+        setToolSettings(prev => ({
+          ...prev,
+          [selectedTool]: {
+            ...prev[selectedTool],
+            [key]: parseFloat(value) || 0
+          }
+        }));
+      };
+
+      const generateGCode = () => {
+        const dDia = parseFloat(dowelDiameter);
+        const dLen = parseFloat(dowelLength);
+        const tDia = currentTool.diameter;
+        const rpm = currentTool.rpm;
+        const feed = currentTool.feed;
+        const safe = parseFloat(safeZ);
+        const tNum = parseInt(toolNumber);
+        
+        const { toolCenterRadius, numPasses, actualStepdown, dowelPositions, totalDowels } = calculations;
+        
+        let lineNum = 10;
+        const line = (code) => {
+          const result = `N${lineNum} ${code}`;
+          lineNum += 5;
+          return result;
+        };
+
+        let gcode = [];
+        
+        // Header
+        gcode.push('%');
+        gcode.push(`(MULTI-DOWEL: ${totalDowels}x ${dDia}" DIA x ${dLen}" LONG)`);
+        gcode.push(`(GRID: ${calculations.cols} COLS x ${calculations.rows} ROWS)`);
+        gcode.push(`(MIN STOCK: ${calculations.minStockX.toFixed(3)}" x ${calculations.minStockY.toFixed(3)}")`);
+        gcode.push(`(T${tNum} D=${tDia} - FLAT END MILL)`);
+        gcode.push(line('G90 G94 G17 G91.1'));
+        gcode.push(line('G20'));
+        gcode.push(line('G53 G0 Z-0.5'));
+        gcode.push(line(`T${tNum} M6`));
+        gcode.push(line(`S${rpm} M3`));
+        gcode.push(line('G17 G90 G94'));
+        gcode.push(line('G54'));
+        gcode.push(line('G64'));
+        gcode.push(line('M8'));
+        
+        // Generate toolpath for each dowel
+        dowelPositions.forEach((pos, idx) => {
+          gcode.push(`(DOWEL ${pos.index} AT X${pos.x.toFixed(4)} Y${pos.y.toFixed(4)})`);
+          
+          // Lead-in position
+          const leadIn = tDia / 2;
+          const startX = (pos.x + toolCenterRadius + leadIn).toFixed(4);
+          const startY = (pos.y + leadIn).toFixed(4);
+          
+          // Rapid to position
+          gcode.push(line(`G0 X${startX} Y${startY}`));
+          if (idx === 0) {
+            gcode.push(line(`Z${safe}`));
+          }
+          gcode.push(line('G0 Z0.08'));
+          
+          // Lead-in arc (XZ plane)
+          gcode.push(line(`G1 Z${leadIn.toFixed(4)} F${feed}.`));
+          gcode.push(line(`G18 G3 X${(pos.x + toolCenterRadius).toFixed(4)} Z0. I-${leadIn.toFixed(4)} K0.`));
+          gcode.push(line(`G1 X${(pos.x + toolCenterRadius - (tDia * 0.05)).toFixed(4)}`));
+          gcode.push(line(`G17 G3 X${(pos.x + toolCenterRadius).toFixed(4)} Y${pos.y.toFixed(4)} I0. J-${leadIn.toFixed(4)}`));
+          
+          // Helical passes - G2 arcs stepping down
+          let currentZ = 0;
+          for (let i = 0; i < numPasses * 2; i++) {
+            currentZ -= actualStepdown / 2;
+            const xOffset = (i % 2 === 0) ? -toolCenterRadius : toolCenterRadius;
+            const iVal = (i % 2 === 0) ? -toolCenterRadius : toolCenterRadius;
+            gcode.push(line(`X${(pos.x + xOffset).toFixed(4)} Z${currentZ.toFixed(4)} I${iVal.toFixed(4)} J0.`));
+          }
+          
+          // Final full circles at depth
+          const finalZ = -dLen;
+          gcode.push(line(`X${(pos.x - toolCenterRadius).toFixed(4)} Y${pos.y.toFixed(4)} Z${finalZ.toFixed(4)} I${(-toolCenterRadius).toFixed(4)} J0.`));
+          gcode.push(line(`X${(pos.x + toolCenterRadius).toFixed(4)} Y${pos.y.toFixed(4)} I${toolCenterRadius.toFixed(4)} J0.`));
+          gcode.push(line(`X${(pos.x - toolCenterRadius).toFixed(4)} Y${pos.y.toFixed(4)} I${(-toolCenterRadius).toFixed(4)} J0.`));
+          
+          // Lead-out
+          const loX = (pos.x + toolCenterRadius * 0.3).toFixed(4);
+          const loY = (pos.y - toolCenterRadius * 0.95).toFixed(4);
+          gcode.push(line(`G3 X${loX} Y${loY} I${toolCenterRadius.toFixed(4)} J0.`));
+          
+          // Retract
+          gcode.push(line(`G0 Z${safe}`));
+        });
+        
+        // End program
+        gcode.push(line('M5'));
+        gcode.push(line('M9'));
+        gcode.push(line('G53 G0 Z-0.5'));
+        gcode.push(line('M30'));
+        gcode.push('%');
+        
+        return gcode.join('\n');
+      };
+
+      const handleDownload = () => {
+        const gcode = generateGCode();
+        const blob = new Blob([gcode], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const cols = parseInt(numColumns);
+        const rows = parseInt(numRows);
+        a.download = `dowels_${cols}x${rows}_${dowelDiameter}dia_${dowelLength}len.nc`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      // SVG Preview calculations
+      const { dDia, dLen, tDia, minStockX, minStockY, dowelPositions, toolCenterRadius, outerSweep, edgeMargin } = calculations;
+      
+      // Front view (single dowel) dimensions
+      const frontViewWidth = 200;
+      const frontViewHeight = 220;
+      const frontScale = Math.min(80 / dDia, 150 / dLen, 100);
+      const frontDowelW = dDia * frontScale;
+      const frontDowelH = dLen * frontScale;
+      
+      // Top view dimensions
+      const topViewWidth = 380;
+      const topViewHeight = 280;
+      const topPadding = 50;
+      const availableWidth = topViewWidth - (2 * topPadding);
+      const availableHeight = topViewHeight - (2 * topPadding);
+      const topScale = Math.min(availableWidth / minStockX, availableHeight / minStockY, 150);
+
+      return (
+        <div className="app">
+          <header>
+            <h1>Multi-Dowel G-Code Generator</h1>
+            <p>Generate toolpaths for multiple dowels in a grid pattern</p>
+          </header>
+          
+          <div className="main-layout">
+            {/* Left Panel - Inputs */}
+            <div className="panel">
+              <div className="panel-header">
+                <h2>Parameters</h2>
+              </div>
+              <div className="panel-body">
+                
+                <div className="input-section">
+                  <div className="input-section-title">Dowel Dimensions</div>
+                  <div className="input-row">
+                    <div className="input-group">
+                      <label>Diameter</label>
+                      <div className="input-with-unit">
+                        <input 
+                          type="number" 
+                          step="0.001" 
+                          value={dowelDiameter}
+                          onChange={(e) => setDowelDiameter(e.target.value)}
+                        />
+                        <span className="input-unit">in</span>
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>Length</label>
+                      <div className="input-with-unit">
+                        <input 
+                          type="number" 
+                          step="0.001" 
+                          value={dowelLength}
+                          onChange={(e) => setDowelLength(e.target.value)}
+                        />
+                        <span className="input-unit">in</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="input-section">
+                  <div className="input-section-title">Grid Layout</div>
+                  <div className="input-row-3">
+                    <div className="input-group">
+                      <label>Columns (X)</label>
+                      <input 
+                        type="number" 
+                        min="1"
+                        max="20"
+                        value={numColumns}
+                        onChange={(e) => setNumColumns(e.target.value)}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Rows (Y)</label>
+                      <input 
+                        type="number" 
+                        min="1"
+                        max="20"
+                        value={numRows}
+                        onChange={(e) => setNumRows(e.target.value)}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Clearance</label>
+                      <div className="input-with-unit">
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          min="0"
+                          value={clearance}
+                          onChange={(e) => setClearance(e.target.value)}
+                        />
+                        <span className="input-unit">in</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="input-section">
+                  <div className="input-section-title">Tooling</div>
+                  <div className="input-group">
+                    <label>End Mill</label>
+                    <select 
+                      value={selectedTool}
+                      onChange={(e) => setSelectedTool(e.target.value)}
+                    >
+                      {Object.entries(toolSettings).map(([key, tool]) => (
+                        <option key={key} value={key}>{tool.name} Flat End Mill</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button 
+                    className={`collapsible-header ${showToolSettings ? 'open' : ''}`}
+                    onClick={() => setShowToolSettings(!showToolSettings)}
+                  >
+                    <span>Advanced Tool Settings</span>
+                    <span className="chevron">▼</span>
+                  </button>
+
+                  {showToolSettings && (
+                    <div className="collapsible-content">
+                      <div className="input-row">
+                        <div className="input-group">
+                          <label>Spindle RPM</label>
+                          <input 
+                            type="number" 
+                            value={currentTool.rpm}
+                            onChange={(e) => updateToolSetting('rpm', e.target.value)}
+                          />
+                        </div>
+                        <div className="input-group">
+                          <label>Feed Rate</label>
+                          <div className="input-with-unit">
+                            <input 
+                              type="number" 
+                              value={currentTool.feed}
+                              onChange={(e) => updateToolSetting('feed', e.target.value)}
+                            />
+                            <span className="input-unit">ipm</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="input-row" style={{marginTop: '12px'}}>
+                        <div className="input-group">
+                          <label>Stepdown/Rev</label>
+                          <div className="input-with-unit">
+                            <input 
+                              type="number" 
+                              step="0.001"
+                              value={currentTool.stepdown}
+                              onChange={(e) => updateToolSetting('stepdown', e.target.value)}
+                            />
+                            <span className="input-unit">in</span>
+                          </div>
+                        </div>
+                        <div className="input-group">
+                          <label>Tool Number</label>
+                          <input 
+                            type="number" 
+                            value={toolNumber}
+                            onChange={(e) => setToolNumber(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="input-group" style={{marginTop: '12px'}}>
+                        <label>Safe Z Height</label>
+                        <div className="input-with-unit">
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={safeZ}
+                            onChange={(e) => setSafeZ(e.target.value)}
+                          />
+                          <span className="input-unit">in</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button className="generate-btn" onClick={handleDownload}>
+                  Download G-Code
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column - Previews and Info */}
+            <div className="right-column">
+              <div className="panel">
+                <div className="panel-header">
+                  <h2>Preview</h2>
+                </div>
+                <div className="panel-body">
+                  <div className="preview-grid">
+                    {/* Front View - Single Dowel */}
+                    <div className="preview-box">
+                      <h3>Front View (Single Dowel)</h3>
+                      <svg width={frontViewWidth} height={frontViewHeight} viewBox={`0 0 ${frontViewWidth} ${frontViewHeight}`}>
+                        {/* Stock surface line */}
+                        <line 
+                          x1="20" y1="30" 
+                          x2={frontViewWidth - 20} y2="30" 
+                          stroke="var(--text-muted)" 
+                          strokeWidth="2"
+                        />
+                        <text x={frontViewWidth - 15} y="35" className="axis-label" textAnchor="end">Stock Top</text>
+                        
+                        {/* Dowel body */}
+                        <rect 
+                          x={(frontViewWidth - frontDowelW) / 2} 
+                          y={30}
+                          width={frontDowelW}
+                          height={frontDowelH}
+                          fill="var(--wood)"
+                          stroke="var(--wood-dark)"
+                          strokeWidth="2"
+                          rx="2"
+                        />
+                        
+                        {/* Grain lines */}
+                        {[...Array(Math.max(2, Math.floor(dLen * 3)))].map((_, i) => (
+                          <line 
+                            key={i}
+                            x1={(frontViewWidth - frontDowelW) / 2 + 3}
+                            y1={30 + (i + 1) * (frontDowelH / (Math.floor(dLen * 3) + 1))}
+                            x2={(frontViewWidth + frontDowelW) / 2 - 3}
+                            y2={30 + (i + 1) * (frontDowelH / (Math.floor(dLen * 3) + 1))}
+                            stroke="var(--wood-grain)"
+                            strokeWidth="1"
+                            opacity="0.5"
+                          />
+                        ))}
+                        
+                        {/* Diameter dimension (top) */}
+                        <line 
+                          x1={(frontViewWidth - frontDowelW) / 2} y1="20"
+                          x2={(frontViewWidth + frontDowelW) / 2} y2="20"
+                          className="dim-line"
+                        />
+                        <line 
+                          x1={(frontViewWidth - frontDowelW) / 2} y1="15"
+                          x2={(frontViewWidth - frontDowelW) / 2} y2="25"
+                          className="dim-line"
+                        />
+                        <line 
+                          x1={(frontViewWidth + frontDowelW) / 2} y1="15"
+                          x2={(frontViewWidth + frontDowelW) / 2} y2="25"
+                          className="dim-line"
+                        />
+                        <text 
+                          x={frontViewWidth / 2} y="14"
+                          textAnchor="middle"
+                          className="dim-text"
+                        >
+                          ⌀{dDia}"
+                        </text>
+                        
+                        {/* Length dimension (right side) */}
+                        <line 
+                          x1={(frontViewWidth + frontDowelW) / 2 + 15} y1="30"
+                          x2={(frontViewWidth + frontDowelW) / 2 + 15} y2={30 + frontDowelH}
+                          className="dim-line"
+                        />
+                        <line 
+                          x1={(frontViewWidth + frontDowelW) / 2 + 10} y1="30"
+                          x2={(frontViewWidth + frontDowelW) / 2 + 20} y2="30"
+                          className="dim-line"
+                        />
+                        <line 
+                          x1={(frontViewWidth + frontDowelW) / 2 + 10} y1={30 + frontDowelH}
+                          x2={(frontViewWidth + frontDowelW) / 2 + 20} y2={30 + frontDowelH}
+                          className="dim-line"
+                        />
+                        <text 
+                          x={(frontViewWidth + frontDowelW) / 2 + 25} 
+                          y={30 + frontDowelH / 2 + 4}
+                          textAnchor="start"
+                          className="dim-text"
+                        >
+                          {dLen}"
+                        </text>
+                      </svg>
+                    </div>
+
+                    {/* Top View - Grid Layout */}
+                    <div className="preview-box">
+                      <h3>Top View (Stock Layout)</h3>
+                      <svg width={topViewWidth} height={topViewHeight} viewBox={`0 0 ${topViewWidth} ${topViewHeight}`}>
+                        {/* Origin marker and axes */}
+                        <circle 
+                          cx={topPadding} 
+                          cy={topPadding} 
+                          r="4" 
+                          className="origin-marker"
+                        />
+                        <text x={topPadding - 8} y={topPadding - 10} className="axis-label">0,0</text>
+                        
+                        {/* X axis arrow */}
+                        <line 
+                          x1={topPadding} y1={topPadding}
+                          x2={topPadding + 30} y2={topPadding}
+                          stroke="var(--success)" strokeWidth="1.5"
+                        />
+                        <polygon 
+                          points={`${topPadding + 30},${topPadding - 4} ${topPadding + 38},${topPadding} ${topPadding + 30},${topPadding + 4}`}
+                          fill="var(--success)"
+                        />
+                        <text x={topPadding + 42} y={topPadding + 4} className="axis-label" fill="var(--success)">X</text>
+                        
+                        {/* Y axis arrow */}
+                        <line 
+                          x1={topPadding} y1={topPadding}
+                          x2={topPadding} y2={topPadding + 30}
+                          stroke="var(--success)" strokeWidth="1.5"
+                        />
+                        <polygon 
+                          points={`${topPadding - 4},${topPadding + 30} ${topPadding},${topPadding + 38} ${topPadding + 4},${topPadding + 30}`}
+                          fill="var(--success)"
+                        />
+                        <text x={topPadding + 6} y={topPadding + 45} className="axis-label" fill="var(--success)">Y</text>
+                        
+                        {/* Stock outline */}
+                        <rect 
+                          x={topPadding}
+                          y={topPadding}
+                          width={minStockX * topScale}
+                          height={minStockY * topScale}
+                          className="stock-outline"
+                          rx="2"
+                        />
+                        
+                        {/* Stock dimensions */}
+                        <text 
+                          x={topPadding + (minStockX * topScale) / 2} 
+                          y={topPadding + minStockY * topScale + 18}
+                          textAnchor="middle"
+                          className="dim-text"
+                        >
+                          {minStockX.toFixed(2)}"
+                        </text>
+                        <text 
+                          x={topPadding + minStockX * topScale + 8} 
+                          y={topPadding + (minStockY * topScale) / 2}
+                          textAnchor="start"
+                          className="dim-text"
+                          transform={`rotate(90, ${topPadding + minStockX * topScale + 8}, ${topPadding + (minStockY * topScale) / 2})`}
+                        >
+                          {minStockY.toFixed(2)}"
+                        </text>
+                        
+                        {/* Dowels and tool paths */}
+                        {dowelPositions.map((pos, idx) => (
+                          <g key={idx}>
+                            {/* Tool path circle */}
+                            <circle 
+                              cx={topPadding + pos.x * topScale}
+                              cy={topPadding + pos.y * topScale}
+                              r={toolCenterRadius * topScale}
+                              className="tool-path"
+                            />
+                            {/* Dowel circle */}
+                            <circle 
+                              cx={topPadding + pos.x * topScale}
+                              cy={topPadding + pos.y * topScale}
+                              r={(dDia / 2) * topScale}
+                              className="dowel-circle"
+                            />
+                            {/* Dowel number */}
+                            <text 
+                              x={topPadding + pos.x * topScale}
+                              y={topPadding + pos.y * topScale + 4}
+                              textAnchor="middle"
+                              fontSize="10"
+                              fill="var(--bg-primary)"
+                              fontWeight="600"
+                              fontFamily="JetBrains Mono"
+                            >
+                              {pos.index}
+                            </text>
+                          </g>
+                        ))}
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Cards */}
+              <div className="panel">
+                <div className="panel-header">
+                  <h2>Calculated Values</h2>
+                </div>
+                <div className="panel-body">
+                  <div className="info-grid">
+                    <div className="info-card highlight">
+                      <div className="info-card-label">Total Dowels</div>
+                      <div className="info-card-value">{calculations.totalDowels}</div>
+                      <div className="info-card-sub">{calculations.cols} × {calculations.rows} grid</div>
+                    </div>
+                    <div className="info-card highlight">
+                      <div className="info-card-label">Min Stock Size</div>
+                      <div className="info-card-value">{calculations.minStockX.toFixed(3)}"</div>
+                      <div className="info-card-sub">× {calculations.minStockY.toFixed(3)}"</div>
+                    </div>
+                    <div className="info-card">
+                      <div className="info-card-label">Center Spacing</div>
+                      <div className="info-card-value">{calculations.spacing.toFixed(4)}"</div>
+                      <div className="info-card-sub">between dowels</div>
+                    </div>
+                    <div className="info-card">
+                      <div className="info-card-label">Edge Margin</div>
+                      <div className="info-card-value">{calculations.edgeMargin.toFixed(4)}"</div>
+                      <div className="info-card-sub">to first dowel center</div>
+                    </div>
+                    <div className="info-card">
+                      <div className="info-card-label">Tool Center Radius</div>
+                      <div className="info-card-value">{calculations.toolCenterRadius.toFixed(4)}"</div>
+                      <div className="info-card-sub">orbit path</div>
+                    </div>
+                    <div className="info-card">
+                      <div className="info-card-label">Passes per Dowel</div>
+                      <div className="info-card-value">{calculations.numPasses}</div>
+                      <div className="info-card-sub">{calculations.actualStepdown.toFixed(4)}" stepdown</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<MultiDowelGenerator />, document.getElementById('root'));
+  </script>
+</body>
+</html>
