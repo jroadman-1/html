@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dowel G-Code Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #4fc3f7;
+      font-weight: 500;
+    }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+    @media (max-width: 700px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .panel h2 {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+      margin-bottom: 20px;
+    }
+    .input-group {
+      margin-bottom: 20px;
+    }
+    .input-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: #aaa;
+    }
+    .input-group input, .input-group select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #0f0f23;
+      color: #fff;
+      font-size: 16px;
+    }
+    .input-group input:focus, .input-group select:focus {
+      outline: none;
+      border-color: #4fc3f7;
+    }
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    .advanced-toggle {
+      background: none;
+      border: 1px solid #444;
+      color: #888;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      width: 100%;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .advanced-toggle:hover {
+      border-color: #666;
+      color: #aaa;
+    }
+    .advanced-toggle .arrow {
+      transition: transform 0.2s;
+    }
+    .advanced-toggle.open .arrow {
+      transform: rotate(180deg);
+    }
+    .advanced-panel {
+      background: #0f0f23;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .advanced-panel .input-group {
+      margin-bottom: 12px;
+    }
+    .advanced-panel .input-group:last-child {
+      margin-bottom: 0;
+    }
+    .preview-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+    }
+    .dowel-preview {
+      position: relative;
+    }
+    .dowel-preview svg {
+      max-width: 100%;
+    }
+    .dimension-text {
+      font-size: 12px;
+      fill: #4fc3f7;
+      font-family: monospace;
+    }
+    .generate-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .generate-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(79, 195, 247, 0.3);
+    }
+    .generate-btn:active {
+      transform: translateY(0);
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #222;
+      font-size: 14px;
+    }
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    .info-label { color: #888; }
+    .info-value { color: #4fc3f7; font-family: monospace; }
+    .unit-hint {
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // Default tool presets
+    const defaultTools = {
+      '0.125': { name: '1/8"', diameter: 0.125, rpm: 24000, feed: 30, stepdown: 0.006 },
+      '0.1875': { name: '3/16"', diameter: 0.1875, rpm: 20000, feed: 40, stepdown: 0.0085 },
+      '0.25': { name: '1/4"', diameter: 0.25, rpm: 18000, feed: 50, stepdown: 0.010 }
+    };
+
+    function DowelGenerator() {
+      const [dowelDiameter, setDowelDiameter] = useState('0.25');
+      const [dowelLength, setDowelLength] = useState('1.0');
+      const [selectedTool, setSelectedTool] = useState('0.1875');
+      const [showAdvanced, setShowAdvanced] = useState(false);
+      const [toolSettings, setToolSettings] = useState({...defaultTools});
+      const [toolNumber, setToolNumber] = useState('3');
+      const [safeZ, setSafeZ] = useState('0.6');
+
+      const currentTool = toolSettings[selectedTool];
+      
+      // Calculate derived values
+      const calculations = useMemo(() => {
+        const dDia = parseFloat(dowelDiameter) || 0;
+        const dLen = parseFloat(dowelLength) || 0;
+        const tDia = currentTool.diameter;
+        const stepdown = currentTool.stepdown;
+        
+        const toolCenterRadius = (dDia / 2) + (tDia / 2);
+        const numPasses = Math.ceil(dLen / stepdown);
+        const actualStepdown = dLen / numPasses;
+        
+        return {
+          toolCenterRadius,
+          numPasses,
+          actualStepdown,
+          dowelRadius: dDia / 2
+        };
+      }, [dowelDiameter, dowelLength, currentTool]);
+
+      const updateToolSetting = (key, value) => {
+        setToolSettings(prev => ({
+          ...prev,
+          [selectedTool]: {
+            ...prev[selectedTool],
+            [key]: parseFloat(value) || 0
+          }
+        }));
+      };
+
+      const generateGCode = () => {
+        const dDia = parseFloat(dowelDiameter);
+        const dLen = parseFloat(dowelLength);
+        const tDia = currentTool.diameter;
+        const rpm = currentTool.rpm;
+        const feed = currentTool.feed;
+        const safe = parseFloat(safeZ);
+        const tNum = parseInt(toolNumber);
+        
+        const { toolCenterRadius, numPasses, actualStepdown } = calculations;
+        
+        let lineNum = 10;
+        const line = (code) => {
+          const result = `N${lineNum} ${code}`;
+          lineNum += 5;
+          return result;
+        };
+
+        let gcode = [];
+        
+        // Header
+        gcode.push('%');
+        gcode.push(`(DOWEL ${dDia}" DIA x ${dLen}" LONG)`);
+        gcode.push(`(T${tNum} D=${tDia} - FLAT END MILL)`);
+        gcode.push(line('G90 G94 G17 G91.1'));
+        gcode.push(line('G20'));
+        gcode.push(line('G53 G0 Z-0.5'));
+        gcode.push('(DOWEL CUT)');
+        gcode.push(line(`T${tNum} M6`));
+        gcode.push(line(`S${rpm} M3`));
+        gcode.push(line('G17 G90 G94'));
+        gcode.push(line('G54'));
+        gcode.push(line('G64'));
+        gcode.push(line('M8'));
+        
+        // Position to start - offset for lead-in
+        const leadIn = tDia / 2;
+        const startX = (toolCenterRadius + leadIn).toFixed(4);
+        const startY = leadIn.toFixed(4);
+        
+        gcode.push(line(`G0 X${startX} Y${startY}`));
+        gcode.push(line(`Z${safe}`));
+        gcode.push(line('G0 Z0.08'));
+        
+        // Lead-in arc (XY plane)
+        gcode.push(line(`G1 Z${leadIn.toFixed(4)} F${feed}.`));
+        gcode.push(line(`G18 G3 X${toolCenterRadius.toFixed(4)} Z0. I-${leadIn.toFixed(4)} K0.`));
+        gcode.push(line(`G1 X${(toolCenterRadius - (tDia * 0.05)).toFixed(4)}`));
+        gcode.push(line(`G17 G3 X${toolCenterRadius.toFixed(4)} Y0. I0. J-${leadIn.toFixed(4)}`));
+        
+        // Helical passes - alternating G2 arcs in XY stepping down in Z
+        let currentZ = 0;
+        for (let i = 0; i < numPasses * 2; i++) {
+          currentZ -= actualStepdown / 2;
+          const xPos = (i % 2 === 0) ? -toolCenterRadius : toolCenterRadius;
+          const iVal = (i % 2 === 0) ? -toolCenterRadius : toolCenterRadius;
+          gcode.push(line(`X${xPos.toFixed(4)} Z${currentZ.toFixed(4)} I${iVal.toFixed(4)} J0.`));
+        }
+        
+        // Final full circles at depth
+        const finalZ = -dLen;
+        gcode.push(line(`X${(-toolCenterRadius).toFixed(4)} Y0. Z${finalZ.toFixed(4)} I${(-toolCenterRadius).toFixed(4)} J0.`));
+        gcode.push(line(`X${toolCenterRadius.toFixed(4)} Y0. I${toolCenterRadius.toFixed(4)} J0.`));
+        gcode.push(line(`X${(-toolCenterRadius).toFixed(4)} Y0. I${(-toolCenterRadius).toFixed(4)} J0.`));
+        
+        // Lead-out
+        const loX = (toolCenterRadius * 0.3).toFixed(4);
+        const loY = (-toolCenterRadius * 0.95).toFixed(4);
+        gcode.push(line(`G3 X${loX} Y${loY} I${toolCenterRadius.toFixed(4)} J0.`));
+        
+        // Retract and end
+        gcode.push(line(`G0 Z${safe}`));
+        gcode.push(line('M5'));
+        gcode.push(line('M9'));
+        gcode.push(line('G53 G0 Z-0.5'));
+        gcode.push(line('M30'));
+        gcode.push('%');
+        
+        return gcode.join('\n');
+      };
+
+      const handleDownload = () => {
+        const gcode = generateGCode();
+        const blob = new Blob([gcode], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `dowel_${dowelDiameter}dia_${dowelLength}len.nc`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      // SVG Preview dimensions
+      const svgWidth = 280;
+      const svgHeight = 180;
+      const previewScale = 100; // pixels per inch for preview
+      const dDia = parseFloat(dowelDiameter) || 0.25;
+      const dLen = parseFloat(dowelLength) || 1;
+      
+      // Scale to fit
+      const maxDim = Math.max(dDia, dLen);
+      const scale = Math.min(120 / maxDim, 200);
+      const dowelW = dLen * scale;
+      const dowelH = dDia * scale;
+
+      return (
+        <div className="container">
+          <h1>Dowel G-Code Generator</h1>
+          
+          <div className="main-grid">
+            <div className="panel">
+              <h2>Dowel Dimensions</h2>
+              
+              <div className="input-row">
+                <div className="input-group">
+                  <label>Diameter</label>
+                  <input 
+                    type="number" 
+                    step="0.001" 
+                    value={dowelDiameter}
+                    onChange={(e) => setDowelDiameter(e.target.value)}
+                  />
+                  <div className="unit-hint">inches</div>
+                </div>
+                <div className="input-group">
+                  <label>Length</label>
+                  <input 
+                    type="number" 
+                    step="0.001" 
+                    value={dowelLength}
+                    onChange={(e) => setDowelLength(e.target.value)}
+                  />
+                  <div className="unit-hint">inches</div>
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label>End Mill</label>
+                <select 
+                  value={selectedTool}
+                  onChange={(e) => setSelectedTool(e.target.value)}
+                >
+                  {Object.entries(toolSettings).map(([key, tool]) => (
+                    <option key={key} value={key}>{tool.name} Flat End Mill</option>
+                  ))}
+                </select>
+              </div>
+
+              <button 
+                className={`advanced-toggle ${showAdvanced ? 'open' : ''}`}
+                onClick={() => setShowAdvanced(!showAdvanced)}
+              >
+                <span>Tool Settings</span>
+                <span className="arrow">▼</span>
+              </button>
+
+              {showAdvanced && (
+                <div className="advanced-panel">
+                  <div className="input-row">
+                    <div className="input-group">
+                      <label>Spindle RPM</label>
+                      <input 
+                        type="number" 
+                        value={currentTool.rpm}
+                        onChange={(e) => updateToolSetting('rpm', e.target.value)}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Feed Rate</label>
+                      <input 
+                        type="number" 
+                        value={currentTool.feed}
+                        onChange={(e) => updateToolSetting('feed', e.target.value)}
+                      />
+                      <div className="unit-hint">in/min</div>
+                    </div>
+                  </div>
+                  <div className="input-row">
+                    <div className="input-group">
+                      <label>Stepdown/Rev</label>
+                      <input 
+                        type="number" 
+                        step="0.001"
+                        value={currentTool.stepdown}
+                        onChange={(e) => updateToolSetting('stepdown', e.target.value)}
+                      />
+                      <div className="unit-hint">inches</div>
+                    </div>
+                    <div className="input-group">
+                      <label>Tool Number</label>
+                      <input 
+                        type="number" 
+                        value={toolNumber}
+                        onChange={(e) => setToolNumber(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label>Safe Z Height</label>
+                    <input 
+                      type="number" 
+                      step="0.1"
+                      value={safeZ}
+                      onChange={(e) => setSafeZ(e.target.value)}
+                    />
+                    <div className="unit-hint">inches</div>
+                  </div>
+                </div>
+              )}
+
+              <button className="generate-btn" onClick={handleDownload}>
+                Download G-Code
+              </button>
+            </div>
+
+            <div className="panel">
+              <h2>Preview</h2>
+              
+              <div className="preview-container">
+                <svg width={svgWidth} height={svgHeight + 40} viewBox={`0 0 ${svgWidth} ${svgHeight + 40}`}>
+                  {/* Dowel body - rotated 90 degrees (length is now vertical) */}
+                  <rect 
+                    x={(svgWidth - dowelH) / 2} 
+                    y={(svgHeight - dowelW) / 2}
+                    width={dowelH}
+                    height={dowelW}
+                    fill="#8B7355"
+                    stroke="#654321"
+                    strokeWidth="2"
+                    rx="2"
+                  />
+                  
+                  {/* Grain lines - now horizontal */}
+                  {[...Array(Math.max(3, Math.floor(dLen * 4)))].map((_, i) => (
+                    <line 
+                      key={i}
+                      x1={(svgWidth - dowelH) / 2 + 4}
+                      y1={(svgHeight - dowelW) / 2 + (i + 1) * (dowelW / (Math.floor(dLen * 4) + 1))}
+                      x2={(svgWidth + dowelH) / 2 - 4}
+                      y2={(svgHeight - dowelW) / 2 + (i + 1) * (dowelW / (Math.floor(dLen * 4) + 1))}
+                      stroke="#654321"
+                      strokeWidth="1"
+                      opacity="0.3"
+                    />
+                  ))}
+                  
+                  {/* Length dimension - now on the right side, vertical */}
+                  <line 
+                    x1={(svgWidth + dowelH) / 2 + 20}
+                    y1={(svgHeight - dowelW) / 2}
+                    x2={(svgWidth + dowelH) / 2 + 20}
+                    y2={(svgHeight + dowelW) / 2}
+                    stroke="#4fc3f7"
+                    strokeWidth="1"
+                  />
+                  <line 
+                    x1={(svgWidth + dowelH) / 2 + 15}
+                    y1={(svgHeight - dowelW) / 2}
+                    x2={(svgWidth + dowelH) / 2 + 25}
+                    y2={(svgHeight - dowelW) / 2}
+                    stroke="#4fc3f7"
+                    strokeWidth="1"
+                  />
+                  <line 
+                    x1={(svgWidth + dowelH) / 2 + 15}
+                    y1={(svgHeight + dowelW) / 2}
+                    x2={(svgWidth + dowelH) / 2 + 25}
+                    y2={(svgHeight + dowelW) / 2}
+                    stroke="#4fc3f7"
+                    strokeWidth="1"
+                  />
+                  <text 
+                    x={(svgWidth + dowelH) / 2 + 35}
+                    y={svgHeight / 2 + 4}
+                    textAnchor="start"
+                    className="dimension-text"
+                  >
+                    {dLen}"
+                  </text>
+                  
+                  {/* Diameter dimension - now at bottom, horizontal */}
+                  <line 
+                    x1={(svgWidth - dowelH) / 2}
+                    y1={(svgHeight + dowelW) / 2 + 20}
+                    x2={(svgWidth + dowelH) / 2}
+                    y2={(svgHeight + dowelW) / 2 + 20}
+                    stroke="#4fc3f7"
+                    strokeWidth="1"
+                  />
+                  <line 
+                    x1={(svgWidth - dowelH) / 2}
+                    y1={(svgHeight + dowelW) / 2 + 15}
+                    x2={(svgWidth - dowelH) / 2}
+                    y2={(svgHeight + dowelW) / 2 + 25}
+                    stroke="#4fc3f7"
+                    strokeWidth="1"
+                  />
+                  <line 
+                    x1={(svgWidth + dowelH) / 2}
+                    y1={(svgHeight + dowelW) / 2 + 15}
+                    x2={(svgWidth + dowelH) / 2}
+                    y2={(svgHeight + dowelW) / 2 + 25}
+                    stroke="#4fc3f7"
+                    strokeWidth="1"
+                  />
+                  <text 
+                    x={svgWidth / 2}
+                    y={(svgHeight + dowelW) / 2 + 38}
+                    textAnchor="middle"
+                    className="dimension-text"
+                  >
+                    ⌀{dDia}"
+                  </text>
+                </svg>
+              </div>
+
+              <div style={{marginTop: '20px'}}>
+                <div className="info-row">
+                  <span className="info-label">Tool Center Radius</span>
+                  <span className="info-value">{calculations.toolCenterRadius.toFixed(4)}"</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Number of Passes</span>
+                  <span className="info-value">{calculations.numPasses}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Actual Stepdown</span>
+                  <span className="info-value">{calculations.actualStepdown.toFixed(4)}"</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">End Mill</span>
+                  <span className="info-value">{currentTool.name}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<DowelGenerator />, document.getElementById('root'));
+  </script>
+</body>
+</html>
