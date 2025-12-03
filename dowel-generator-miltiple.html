@@ -391,7 +391,7 @@
       // Grid parameters
       const [numColumns, setNumColumns] = useState('3');
       const [numRows, setNumRows] = useState('2');
-      const [clearance, setClearance] = useState('0.1');
+      const [clearance, setClearance] = useState('0.01');
       
       // Tool parameters
       const [selectedTool, setSelectedTool] = useState('0.1875');
@@ -410,7 +410,7 @@
         const stepdown = currentTool.stepdown;
         const cols = parseInt(numColumns) || 1;
         const rows = parseInt(numRows) || 1;
-        const clr = parseFloat(clearance) || 0.1;
+        const clr = parseFloat(clearance) || 0.01;
         
         // Tool center radius (where tool center orbits)
         const toolCenterRadius = (dDia / 2) + (tDia / 2);
