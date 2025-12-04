@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G-Code Pattern Duplicator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        h1 {
+            text-align: center;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+        }
+        .main-container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .top-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 1000px) {
+            .top-section {
+                grid-template-columns: 1fr;
+            }
+        }
+        .panel {
+            background: #252542;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .panel h2 {
+            margin: 0 0 15px 0;
+            color: #00d4ff;
+            font-size: 18px;
+        }
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        #gcode-input {
+            width: 100%;
+            height: 200px;
+            background: #0a0a15;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 10px;
+            resize: vertical;
+        }
+        #gcode-input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .file-upload {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .file-upload input[type="file"] {
+            display: none;
+        }
+        .file-upload label {
+            padding: 10px 20px;
+            background: #444;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .file-upload label:hover {
+            background: #555;
+        }
+        .file-name {
+            color: #888;
+            font-size: 14px;
+        }
+        .pattern-settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .setting-group {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .setting-group h3 {
+            margin: 0 0 12px 0;
+            color: #00d4ff;
+            font-size: 14px;
+        }
+        .setting-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .setting-row:last-child {
+            margin-bottom: 0;
+        }
+        .setting-row label {
+            color: #aaa;
+            font-size: 14px;
+            min-width: 60px;
+        }
+        .setting-row input[type="number"] {
+            width: 70px;
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #252542;
+            color: #fff;
+            font-size: 14px;
+            text-align: center;
+        }
+        .radio-group {
+            display: flex;
+            gap: 15px;
+        }
+        .radio-label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #aaa;
+        }
+        .radio-label input {
+            cursor: pointer;
+        }
+        .tool-settings {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .tool-setting {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tool-setting label {
+            color: #aaa;
+            font-size: 14px;
+        }
+        .tool-setting input {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 14px;
+            text-align: center;
+        }
+        .tool-setting .detected {
+            color: #00cc66;
+            font-size: 12px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .generate-btn {
+            background: #00d4ff;
+            color: #1a1a2e;
+            font-weight: bold;
+        }
+        .generate-btn:hover {
+            background: #00b8e6;
+        }
+        .copy-btn {
+            background: #00cc66;
+            color: #fff;
+        }
+        .copy-btn:hover {
+            background: #00b359;
+        }
+        .download-btn {
+            background: #9b59b6;
+            color: #fff;
+        }
+        .download-btn:hover {
+            background: #8e44ad;
+        }
+        .clear-btn {
+            background: #ff4757;
+            color: #fff;
+        }
+        .clear-btn:hover {
+            background: #e6404f;
+        }
+        .canvas-container {
+            position: relative;
+            background: #0a0a15;
+            border: 1px solid #444;
+            border-radius: 4px;
+            overflow: hidden;
+            height: 400px;
+        }
+        #preview-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .view-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .view-controls label {
+            color: #aaa;
+            font-size: 13px;
+        }
+        .zoom-btn {
+            background: #444;
+            color: #fff;
+            padding: 8px 12px;
+        }
+        .zoom-btn:hover {
+            background: #555;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .checkbox-label input {
+            cursor: pointer;
+        }
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .legend-line {
+            width: 25px;
+            height: 3px;
+            border-radius: 2px;
+        }
+        .legend-rapid { background: #ff6b6b; opacity: 0.6; }
+        .legend-cut { background: #00cc66; }
+        .legend-original { background: #00d4ff; }
+        .output-section {
+            margin-top: 20px;
+        }
+        #gcode-output {
+            width: 100%;
+            height: 300px;
+            background: #0a0a15;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 10px;
+            resize: vertical;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .stat {
+            background: #1a1a2e;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+        }
+        .info-box {
+            background: #1a2a3a;
+            border-left: 4px solid #00d4ff;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .info-box strong {
+            color: #00d4ff;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .status.success {
+            display: block;
+            background: #1a3a1a;
+            color: #00cc66;
+        }
+        .status.error {
+            display: block;
+            background: #3a1a1a;
+            color: #ff4757;
+        }
+        .section-info {
+            font-size: 12px;
+            color: #888;
+            margin-top: 10px;
+            padding: 10px;
+            background: #1a1a2e;
+            border-radius: 4px;
+        }
+        .section-info span {
+            color: #00cc66;
+        }
+    </style>
+</head>
+<body>
+    <h1>G-Code Pattern Duplicator</h1>
+    <p class="subtitle">Duplicate a single-item G-code into a rectangular grid pattern</p>
+
+    <div class="info-box">
+        <strong>How it works:</strong> Upload or paste G-code for a single item. Set the grid pattern (X × Y count and directions). 
+        The tool separates header/footer from cutting operations, then duplicates the cuts with proper spacing based on toolpath bounds + tool diameter + margin.
+    </div>
+
+    <div class="main-container">
+        <div class="top-section">
+            <div class="panel">
+                <h2>1. Input G-Code</h2>
+                <div class="input-section">
+                    <div class="file-upload">
+                        <input type="file" id="file-input" accept=".nc,.gcode,.tap,.txt">
+                        <label for="file-input">📁 Choose File</label>
+                        <span class="file-name" id="file-name">No file selected</span>
+                    </div>
+                    <textarea id="gcode-input" placeholder="Or paste your G-code here..."></textarea>
+                    <div class="section-info" id="section-info" style="display: none;">
+                        Detected: <span id="header-lines">0</span> header lines, 
+                        <span id="cutting-lines">0</span> cutting lines, 
+                        <span id="footer-lines">0</span> footer lines
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>2. Pattern Settings</h2>
+                <div class="pattern-settings">
+                    <div class="setting-group">
+                        <h3>X Direction (Columns)</h3>
+                        <div class="setting-row">
+                            <label>Count:</label>
+                            <input type="number" id="x-count" value="2" min="1" max="50">
+                        </div>
+                        <div class="setting-row">
+                            <label>Direction:</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="x-dir" value="1" checked> Right (+X)
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="x-dir" value="-1"> Left (-X)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <h3>Y Direction (Rows)</h3>
+                        <div class="setting-row">
+                            <label>Count:</label>
+                            <input type="number" id="y-count" value="2" min="1" max="50">
+                        </div>
+                        <div class="setting-row">
+                            <label>Direction:</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="y-dir" value="1" checked> Back (+Y)
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="y-dir" value="-1"> Front (-Y)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tool-settings" style="margin-top: 15px;">
+                    <div class="tool-setting">
+                        <label>Tool Diameter:</label>
+                        <input type="number" id="tool-dia" value="0.0625" step="0.001" min="0.001">
+                        <span class="detected" id="tool-detected"></span>
+                    </div>
+                    <div class="tool-setting">
+                        <label>Margin:</label>
+                        <input type="number" id="margin" value="0.010" step="0.001" min="0">
+                    </div>
+                </div>
+                <div class="controls">
+                    <button class="generate-btn" onclick="generatePattern()">Generate Pattern</button>
+                    <button class="copy-btn" onclick="copyGcode()">Copy G-Code</button>
+                    <button class="download-btn" onclick="downloadGcode()">Download .nc</button>
+                    <button class="clear-btn" onclick="clearAll()">Clear All</button>
+                </div>
+                <div class="status" id="status"></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>3. Preview</h2>
+            <div class="canvas-container">
+                <canvas id="preview-canvas"></canvas>
+            </div>
+            <div class="view-controls">
+                <button class="zoom-btn" onclick="zoomIn()">Zoom +</button>
+                <button class="zoom-btn" onclick="zoomOut()">Zoom −</button>
+                <button class="zoom-btn" onclick="resetView()">Fit All</button>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="show-rapids" checked onchange="redraw()"> Show Rapids
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="show-grid" checked onchange="redraw()"> Show Grid
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="show-bounds" checked onchange="redraw()"> Show Item Bounds
+                </label>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="legend-line legend-rapid"></div> Rapid (G0)</div>
+                <div class="legend-item"><div class="legend-line legend-cut"></div> Cut (G1/G2/G3)</div>
+                <div class="legend-item"><div class="legend-line legend-original" style="border: 2px dashed #00d4ff; background: transparent;"></div> Item Bounds</div>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="stat-total">0</div>
+                    <div class="stat-label">Total Items</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-spacing-x">0"</div>
+                    <div class="stat-label">X Spacing</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-spacing-y">0"</div>
+                    <div class="stat-label">Y Spacing</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-width">0"</div>
+                    <div class="stat-label">Total Width</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-height">0"</div>
+                    <div class="stat-label">Total Height</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel output-section">
+            <h2>4. Generated G-Code</h2>
+            <textarea id="gcode-output" readonly placeholder="Generated G-code will appear here..."></textarea>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('preview-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let allPaths = [];
+        let itemBounds = [];
+        let bounds = { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+        let zoom = 1;
+        let panX = 0;
+        let panY = 0;
+        
+        let parsedData = null;
+
+        // File upload handling
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('file-name').textContent = file.name;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('gcode-input').value = e.target.result;
+                    analyzeGcode();
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Analyze on paste
+        document.getElementById('gcode-input').addEventListener('input', function() {
+            analyzeGcode();
+        });
+
+        function analyzeGcode() {
+            const gcode = document.getElementById('gcode-input').value;
+            if (!gcode.trim()) {
+                document.getElementById('section-info').style.display = 'none';
+                return;
+            }
+            
+            parsedData = parseAndSeparateGcode(gcode);
+            
+            document.getElementById('section-info').style.display = 'block';
+            document.getElementById('header-lines').textContent = parsedData.header.length;
+            document.getElementById('cutting-lines').textContent = parsedData.cutting.length;
+            document.getElementById('footer-lines').textContent = parsedData.footer.length;
+            
+            // Update tool diameter if detected
+            if (parsedData.toolDiameter) {
+                document.getElementById('tool-dia').value = parsedData.toolDiameter;
+                document.getElementById('tool-detected').textContent = '(detected)';
+            } else {
+                document.getElementById('tool-detected').textContent = '';
+            }
+        }
+
+        function parseAndSeparateGcode(gcode) {
+            const lines = gcode.split('\n');
+            const result = {
+                header: [],
+                cutting: [],
+                footer: [],
+                toolDiameter: null,
+                retractHeight: 0.2,
+                variables: {}
+            };
+            
+            let inCutting = false;
+            let cuttingStarted = false;
+            let lastCuttingIndex = -1;
+            let hasSeenMovement = false;
+            
+            // First pass: detect tool diameter and find cutting section
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Detect tool diameter from comment
+                const toolMatch = line.match(/D\s*=\s*(\d*\.?\d+)/i);
+                if (toolMatch && !result.toolDiameter) {
+                    result.toolDiameter = parseFloat(toolMatch[1]);
+                }
+                
+                // Detect retract height from G0 Z moves
+                const retractMatch = line.match(/G0.*Z\s*(\d*\.?\d+)/i);
+                if (retractMatch) {
+                    const z = parseFloat(retractMatch[1]);
+                    if (z > result.retractHeight) {
+                        result.retractHeight = z;
+                    }
+                }
+                
+                // Check for cutting moves (G1, G2, G3 with Z going negative or X/Y movement)
+                const isCuttingMove = /G[123]\s/i.test(line) || 
+                    (/^[XYZ]/i.test(line.trim()) && hasSeenMovement);
+                
+                const isMovement = /[GXY]/i.test(line);
+                if (isMovement) hasSeenMovement = true;
+                
+                if (isCuttingMove && !/G53/i.test(line)) {
+                    if (!cuttingStarted) {
+                        cuttingStarted = true;
+                    }
+                    lastCuttingIndex = i;
+                }
+            }
+            
+            // Second pass: separate sections
+            hasSeenMovement = false;
+            let reachedCutting = false;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                const isMovement = /[GXY]/i.test(line);
+                if (isMovement) hasSeenMovement = true;
+                
+                const isCuttingMove = /G[123]\s/i.test(line) || 
+                    (/^[XYZ]/i.test(line.trim()) && hasSeenMovement);
+                
+                // Handle variable assignments in header
+                const varAssign = line.match(/#(\d+)\s*=\s*(.+)/);
+                if (varAssign) {
+                    result.variables[varAssign[1]] = varAssign[2].trim();
+                }
+                
+                if (!reachedCutting && isCuttingMove && !/G53/i.test(line)) {
+                    reachedCutting = true;
+                }
+                
+                if (!reachedCutting) {
+                    result.header.push(line);
+                } else if (i <= lastCuttingIndex) {
+                    result.cutting.push(line);
+                } else {
+                    result.footer.push(line);
+                }
+            }
+            
+            // If we captured M5, M9, M30 in cutting, move to footer
+            while (result.cutting.length > 0) {
+                const lastLine = result.cutting[result.cutting.length - 1].trim().toUpperCase();
+                if (lastLine.startsWith('M5') || lastLine.startsWith('M9') || 
+                    lastLine.startsWith('M30') || lastLine === '%' ||
+                    lastLine.startsWith('G53')) {
+                    result.footer.unshift(result.cutting.pop());
+                } else {
+                    break;
+                }
+            }
+            
+            return result;
+        }
+
+        function parseGcodeForPaths(lines, offsetX = 0, offsetY = 0, variables = {}) {
+            const vars = { ...variables };
+            let currentPos = { x: 0, y: 0, z: 0 };
+            let isAbsolute = true;
+            let currentMode = null;
+            const paths = [];
+            
+            for (let line of lines) {
+                // Remove comments
+                line = line.replace(/\(.*?\)/g, '').trim();
+                if (!line || line.startsWith('%')) continue;
+                
+                // Handle variable assignments
+                const varAssign = line.match(/#(\d+)\s*=\s*(.+)/);
+                if (varAssign) {
+                    const varNum = varAssign[1];
+                    let expr = varAssign[2].trim();
+                    
+                    if (expr.startsWith('[') && expr.endsWith(']')) {
+                        expr = expr.slice(1, -1);
+                    }
+                    expr = expr.replace(/#(\d+)/g, (_, num) => vars[num] || 0);
+                    
+                    try {
+                        vars[varNum] = eval(expr);
+                    } catch (e) {
+                        vars[varNum] = parseFloat(expr) || 0;
+                    }
+                    continue;
+                }
+                
+                if (line.includes('G90')) isAbsolute = true;
+                if (line.includes('G91')) isAbsolute = false;
+                
+                if (line.includes('G0') || line.includes('G00')) currentMode = 'rapid';
+                if (line.includes('G1') || line.includes('G01')) currentMode = 'cut';
+                if (line.includes('G2') || line.includes('G02')) currentMode = 'arcCW';
+                if (line.includes('G3') || line.includes('G03')) currentMode = 'arcCCW';
+                
+                // Skip machine coordinate moves
+                if (/G53/i.test(line)) continue;
+                
+                const coords = {};
+                
+                const xMatch = line.match(/X\s*(-?)#?(\d+\.?\d*)/i);
+                const yMatch = line.match(/Y\s*(-?)#?(\d+\.?\d*)/i);
+                const zMatch = line.match(/Z\s*(-?\d*\.?\d+)/i);
+                const iMatch = line.match(/I\s*(-?\d*\.?\d+)/i);
+                const jMatch = line.match(/J\s*(-?\d*\.?\d+)/i);
+                
+                if (xMatch) {
+                    const neg = xMatch[1] === '-';
+                    const varMatch = line.match(/X\s*-?#(\d+)/i);
+                    const val = varMatch ? (vars[varMatch[1]] || 0) : parseFloat(xMatch[2]);
+                    coords.x = (neg ? -val : val) + offsetX;
+                }
+                if (yMatch) {
+                    const neg = yMatch[1] === '-';
+                    const varMatch = line.match(/Y\s*-?#(\d+)/i);
+                    const val = varMatch ? (vars[varMatch[1]] || 0) : parseFloat(yMatch[2]);
+                    coords.y = (neg ? -val : val) + offsetY;
+                }
+                if (zMatch) coords.z = parseFloat(zMatch[1]);
+                if (iMatch) coords.i = parseFloat(iMatch[1]);
+                if (jMatch) coords.j = parseFloat(jMatch[1]);
+                
+                if ((coords.x !== undefined || coords.y !== undefined) && currentMode) {
+                    const startPos = { ...currentPos };
+                    
+                    if (isAbsolute) {
+                        if (coords.x !== undefined) currentPos.x = coords.x;
+                        if (coords.y !== undefined) currentPos.y = coords.y;
+                        if (coords.z !== undefined) currentPos.z = coords.z;
+                    } else {
+                        if (coords.x !== undefined) currentPos.x += coords.x;
+                        if (coords.y !== undefined) currentPos.y += coords.y;
+                        if (coords.z !== undefined) currentPos.z += coords.z;
+                    }
+                    
+                    const path = {
+                        type: currentMode,
+                        from: { ...startPos },
+                        to: { ...currentPos }
+                    };
+                    
+                    if ((currentMode === 'arcCW' || currentMode === 'arcCCW') && 
+                        (coords.i !== undefined || coords.j !== undefined)) {
+                        path.center = {
+                            x: startPos.x + (coords.i || 0),
+                            y: startPos.y + (coords.j || 0)
+                        };
+                    }
+                    
+                    paths.push(path);
+                }
+            }
+            
+            return { paths, variables: vars };
+        }
+
+        function calculatePathBounds(paths) {
+            if (paths.length === 0) {
+                return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+            }
+            
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
+            
+            for (const path of paths) {
+                minX = Math.min(minX, path.from.x, path.to.x);
+                maxX = Math.max(maxX, path.from.x, path.to.x);
+                minY = Math.min(minY, path.from.y, path.to.y);
+                maxY = Math.max(maxY, path.from.y, path.to.y);
+            }
+            
+            return { minX, maxX, minY, maxY };
+        }
+
+        function generatePattern() {
+            const gcode = document.getElementById('gcode-input').value;
+            if (!gcode.trim()) {
+                showStatus('Please provide G-code first.', 'error');
+                return;
+            }
+            
+            if (!parsedData) {
+                analyzeGcode();
+            }
+            
+            const xCount = parseInt(document.getElementById('x-count').value) || 1;
+            const yCount = parseInt(document.getElementById('y-count').value) || 1;
+            const xDir = parseInt(document.querySelector('input[name="x-dir"]:checked').value);
+            const yDir = parseInt(document.querySelector('input[name="y-dir"]:checked').value);
+            const toolDia = parseFloat(document.getElementById('tool-dia').value) || 0.0625;
+            const margin = parseFloat(document.getElementById('margin').value) || 0.010;
+            
+            // Parse original cutting paths to get bounds
+            const originalResult = parseGcodeForPaths(parsedData.cutting, 0, 0, parsedData.variables);
+            const originalPaths = originalResult.paths;
+            const originalBounds = calculatePathBounds(originalPaths);
+            
+            // Calculate spacing
+            const itemWidth = originalBounds.maxX - originalBounds.minX;
+            const itemHeight = originalBounds.maxY - originalBounds.minY;
+            const spacingX = itemWidth + toolDia + margin;
+            const spacingY = itemHeight + toolDia + margin;
+            
+            // Generate all paths for preview
+            allPaths = [];
+            itemBounds = [];
+            const outputLines = [];
+            
+            // Add header
+            outputLines.push(...parsedData.header);
+            outputLines.push('');
+            outputLines.push(`(PATTERN: ${xCount} x ${yCount} = ${xCount * yCount} items)`);
+            outputLines.push(`(SPACING: X=${spacingX.toFixed(4)}" Y=${spacingY.toFixed(4)}")`);
+            outputLines.push('');
+            
+            let itemNum = 0;
+            for (let row = 0; row < yCount; row++) {
+                for (let col = 0; col < xCount; col++) {
+                    itemNum++;
+                    const offsetX = col * spacingX * xDir;
+                    const offsetY = row * spacingY * yDir;
+                    
+                    // Add comment for this item
+                    outputLines.push(`(--- ITEM ${itemNum}: COL ${col + 1}, ROW ${row + 1} ---)`);
+                    
+                    // Generate offset G-code
+                    for (const line of parsedData.cutting) {
+                        const offsetLine = offsetGcodeLine(line, offsetX, offsetY, parsedData.variables);
+                        outputLines.push(offsetLine);
+                    }
+                    
+                    // Add retract between items (except after last)
+                    if (itemNum < xCount * yCount) {
+                        outputLines.push(`G0 Z${parsedData.retractHeight}`);
+                    }
+                    outputLines.push('');
+                    
+                    // Parse paths for preview
+                    const result = parseGcodeForPaths(parsedData.cutting, offsetX, offsetY, parsedData.variables);
+                    allPaths.push(...result.paths);
+                    
+                    // Store item bounds for preview
+                    itemBounds.push({
+                        minX: originalBounds.minX + offsetX,
+                        maxX: originalBounds.maxX + offsetX,
+                        minY: originalBounds.minY + offsetY,
+                        maxY: originalBounds.maxY + offsetY
+                    });
+                }
+            }
+            
+            // Add footer
+            outputLines.push(...parsedData.footer);
+            
+            // Update output
+            document.getElementById('gcode-output').value = outputLines.join('\n');
+            
+            // Update stats
+            document.getElementById('stat-total').textContent = xCount * yCount;
+            document.getElementById('stat-spacing-x').textContent = spacingX.toFixed(3) + '"';
+            document.getElementById('stat-spacing-y').textContent = spacingY.toFixed(3) + '"';
+            
+            const totalWidth = (xCount - 1) * spacingX + itemWidth;
+            const totalHeight = (yCount - 1) * spacingY + itemHeight;
+            document.getElementById('stat-width').textContent = totalWidth.toFixed(3) + '"';
+            document.getElementById('stat-height').textContent = totalHeight.toFixed(3) + '"';
+            
+            // Update preview
+            bounds = calculatePathBounds(allPaths);
+            const padding = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.1 || 0.5;
+            bounds.minX -= padding;
+            bounds.maxX += padding;
+            bounds.minY -= padding;
+            bounds.maxY += padding;
+            
+            zoom = 1;
+            panX = 0;
+            panY = 0;
+            redraw();
+            
+            showStatus(`Generated pattern: ${xCount} × ${yCount} = ${xCount * yCount} items`, 'success');
+        }
+
+        function offsetGcodeLine(line, offsetX, offsetY, variables) {
+            // Skip comments, variable assignments, and non-movement lines
+            if (line.trim().startsWith('(') || line.trim().startsWith('%') || 
+                line.match(/#\d+\s*=/) || /G53/i.test(line)) {
+                return line;
+            }
+            
+            let result = line;
+            const vars = { ...variables };
+            
+            // Evaluate any variable expressions first
+            // Then offset X and Y coordinates
+            
+            // Handle X with variable
+            const xVarMatch = result.match(/X\s*(-?)#(\d+)/i);
+            if (xVarMatch) {
+                const neg = xVarMatch[1] === '-';
+                let val = parseFloat(vars[xVarMatch[2]]) || 0;
+                if (neg) val = -val;
+                val += offsetX;
+                result = result.replace(/X\s*-?#\d+/i, `X${val.toFixed(4)}`);
+            } else {
+                // Handle X with literal value
+                const xMatch = result.match(/X\s*(-?\d*\.?\d+)/i);
+                if (xMatch) {
+                    const newX = parseFloat(xMatch[1]) + offsetX;
+                    result = result.replace(/X\s*-?\d*\.?\d+/i, `X${newX.toFixed(4)}`);
+                }
+            }
+            
+            // Handle Y with variable
+            const yVarMatch = result.match(/Y\s*(-?)#(\d+)/i);
+            if (yVarMatch) {
+                const neg = yVarMatch[1] === '-';
+                let val = parseFloat(vars[yVarMatch[2]]) || 0;
+                if (neg) val = -val;
+                val += offsetY;
+                result = result.replace(/Y\s*-?#\d+/i, `Y${val.toFixed(4)}`);
+            } else {
+                // Handle Y with literal value
+                const yMatch = result.match(/Y\s*(-?\d*\.?\d+)/i);
+                if (yMatch) {
+                    const newY = parseFloat(yMatch[1]) + offsetY;
+                    result = result.replace(/Y\s*-?\d*\.?\d+/i, `Y${newY.toFixed(4)}`);
+                }
+            }
+            
+            return result;
+        }
+
+        function initCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+
+        function getUniformScale(width, height) {
+            const rangeX = bounds.maxX - bounds.minX;
+            const rangeY = bounds.maxY - bounds.minY;
+            
+            if (rangeX <= 0 || rangeY <= 0) {
+                return zoom * 100;
+            }
+            
+            const scaleX = width / rangeX;
+            const scaleY = height / rangeY;
+            
+            return Math.min(scaleX, scaleY) * zoom;
+        }
+
+        function worldToScreenX(x, width, height) {
+            const centerX = (bounds.minX + bounds.maxX) / 2 + panX;
+            const scale = getUniformScale(width, height);
+            return (x - centerX) * scale + width / 2;
+        }
+
+        function worldToScreenY(y, width, height) {
+            const centerY = (bounds.minY + bounds.maxY) / 2 + panY;
+            const scale = getUniformScale(width, height);
+            return -(y - centerY) * scale + height / 2;
+        }
+
+        function drawGrid() {
+            if (!document.getElementById('show-grid').checked) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const width = rect.width;
+            const height = rect.height;
+            const scale = getUniformScale(width, height);
+            const viewRangeX = width / scale;
+            const viewRangeY = height / scale;
+            
+            let gridSize = 0.1;
+            const maxGridLines = 30;
+            while (Math.max(viewRangeX, viewRangeY) / gridSize > maxGridLines) {
+                gridSize *= 2;
+            }
+            
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 0.5;
+            
+            const centerX = (bounds.minX + bounds.maxX) / 2 + panX;
+            const centerY = (bounds.minY + bounds.maxY) / 2 + panY;
+            
+            const startX = Math.floor((centerX - viewRangeX / 2) / gridSize) * gridSize;
+            for (let x = startX; x < centerX + viewRangeX / 2; x += gridSize) {
+                const screenX = worldToScreenX(x, width, height);
+                ctx.beginPath();
+                ctx.moveTo(screenX, 0);
+                ctx.lineTo(screenX, height);
+                ctx.stroke();
+            }
+            
+            const startY = Math.floor((centerY - viewRangeY / 2) / gridSize) * gridSize;
+            for (let y = startY; y < centerY + viewRangeY / 2; y += gridSize) {
+                const screenY = worldToScreenY(y, width, height);
+                ctx.beginPath();
+                ctx.moveTo(0, screenY);
+                ctx.lineTo(width, screenY);
+                ctx.stroke();
+            }
+            
+            // Origin
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 1;
+            const originX = worldToScreenX(0, width, height);
+            const originY = worldToScreenY(0, width, height);
+            
+            if (originX >= 0 && originX <= width) {
+                ctx.beginPath();
+                ctx.moveTo(originX, 0);
+                ctx.lineTo(originX, height);
+                ctx.stroke();
+            }
+            if (originY >= 0 && originY <= height) {
+                ctx.beginPath();
+                ctx.moveTo(0, originY);
+                ctx.lineTo(width, originY);
+                ctx.stroke();
+            }
+        }
+
+        function drawItemBounds() {
+            if (!document.getElementById('show-bounds').checked) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const width = rect.width;
+            const height = rect.height;
+            
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            
+            for (const item of itemBounds) {
+                const x1 = worldToScreenX(item.minX, width, height);
+                const y1 = worldToScreenY(item.maxY, width, height);
+                const x2 = worldToScreenX(item.maxX, width, height);
+                const y2 = worldToScreenY(item.minY, width, height);
+                
+                ctx.beginPath();
+                ctx.rect(x1, y1, x2 - x1, y2 - y1);
+                ctx.stroke();
+            }
+            
+            ctx.setLineDash([]);
+        }
+
+        function drawPaths() {
+            const rect = canvas.getBoundingClientRect();
+            const width = rect.width;
+            const height = rect.height;
+            const showRapids = document.getElementById('show-rapids').checked;
+            
+            for (const path of allPaths) {
+                const fromX = worldToScreenX(path.from.x, width, height);
+                const fromY = worldToScreenY(path.from.y, width, height);
+                const toX = worldToScreenX(path.to.x, width, height);
+                const toY = worldToScreenY(path.to.y, width, height);
+                
+                ctx.beginPath();
+                
+                if (path.type === 'rapid') {
+                    if (!showRapids) continue;
+                    ctx.strokeStyle = 'rgba(255, 107, 107, 0.5)';
+                    ctx.setLineDash([5, 5]);
+                    ctx.lineWidth = 1;
+                } else {
+                    ctx.strokeStyle = '#00cc66';
+                    ctx.setLineDash([]);
+                    ctx.lineWidth = 2;
+                    
+                    if ((path.type === 'arcCW' || path.type === 'arcCCW') && path.center) {
+                        const centerScreenX = worldToScreenX(path.center.x, width, height);
+                        const centerScreenY = worldToScreenY(path.center.y, width, height);
+                        const radius = Math.sqrt(
+                            Math.pow(fromX - centerScreenX, 2) + 
+                            Math.pow(fromY - centerScreenY, 2)
+                        );
+                        const startAngle = Math.atan2(fromY - centerScreenY, fromX - centerScreenX);
+                        const endAngle = Math.atan2(toY - centerScreenY, toX - centerScreenX);
+                        
+                        ctx.arc(centerScreenX, centerScreenY, radius, startAngle, endAngle, path.type === 'arcCCW');
+                        ctx.stroke();
+                        continue;
+                    }
+                }
+                
+                ctx.moveTo(fromX, fromY);
+                ctx.lineTo(toX, toY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        function redraw() {
+            initCanvas();
+            const rect = canvas.getBoundingClientRect();
+            ctx.clearRect(0, 0, rect.width, rect.height);
+            drawGrid();
+            drawItemBounds();
+            drawPaths();
+        }
+
+        function zoomIn() {
+            zoom *= 1.5;
+            redraw();
+        }
+
+        function zoomOut() {
+            zoom /= 1.5;
+            if (zoom < 0.1) zoom = 0.1;
+            redraw();
+        }
+
+        function resetView() {
+            zoom = 1;
+            panX = 0;
+            panY = 0;
+            redraw();
+        }
+
+        function copyGcode() {
+            const output = document.getElementById('gcode-output');
+            if (!output.value) {
+                showStatus('No G-code to copy. Generate first.', 'error');
+                return;
+            }
+            navigator.clipboard.writeText(output.value).then(() => {
+                showStatus('G-code copied to clipboard!', 'success');
+            });
+        }
+
+        function downloadGcode() {
+            const output = document.getElementById('gcode-output');
+            if (!output.value) {
+                showStatus('No G-code to download. Generate first.', 'error');
+                return;
+            }
+            const xCount = document.getElementById('x-count').value;
+            const yCount = document.getElementById('y-count').value;
+            const blob = new Blob([output.value], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pattern-${xCount}x${yCount}.nc`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showStatus(`Downloaded pattern-${xCount}x${yCount}.nc`, 'success');
+        }
+
+        function clearAll() {
+            document.getElementById('gcode-input').value = '';
+            document.getElementById('gcode-output').value = '';
+            document.getElementById('file-name').textContent = 'No file selected';
+            document.getElementById('section-info').style.display = 'none';
+            document.getElementById('tool-detected').textContent = '';
+            parsedData = null;
+            allPaths = [];
+            itemBounds = [];
+            bounds = { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+            redraw();
+            
+            document.getElementById('stat-total').textContent = '0';
+            document.getElementById('stat-spacing-x').textContent = '0"';
+            document.getElementById('stat-spacing-y').textContent = '0"';
+            document.getElementById('stat-width').textContent = '0"';
+            document.getElementById('stat-height').textContent = '0"';
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            setTimeout(() => {
+                status.className = 'status';
+            }, 3000);
+        }
+
+        // Pan and zoom
+        let isDragging = false;
+        let lastMouseX, lastMouseY;
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            canvas.style.cursor = 'grabbing';
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const width = rect.width;
+            const height = rect.height;
+            const scale = getUniformScale(width, height);
+            
+            const dx = e.clientX - lastMouseX;
+            const dy = e.clientY - lastMouseY;
+            
+            panX -= dx / scale;
+            panY += dy / scale;
+            
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            
+            redraw();
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isDragging = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        canvas.style.cursor = 'grab';
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (e.deltaY < 0) {
+                zoom *= 1.2;
+            } else {
+                zoom /= 1.2;
+                if (zoom < 0.1) zoom = 0.1;
+            }
+            redraw();
+        });
+
+        window.addEventListener('resize', redraw);
+        initCanvas();
+        drawGrid();
+    </script>
+</body>
+</html>
