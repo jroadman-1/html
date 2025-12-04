@@ -365,7 +365,8 @@
 
     <div class="info-box">
         <strong>How it works:</strong> Upload or paste G-code for a single item. Set the grid pattern (X × Y count and directions). 
-        The tool separates header/footer from cutting operations, then duplicates the cuts with proper spacing based on toolpath bounds + tool diameter + margin.
+        The tool separates header/footer from cutting operations, detects tool changes, and groups operations by tool.
+        <strong>Each tool runs on ALL items before the next tool change</strong> — minimizing tool changes for efficient production.
     </div>
 
     <div class="main-container">
@@ -382,7 +383,8 @@
                     <div class="section-info" id="section-info" style="display: none;">
                         Detected: <span id="header-lines">0</span> header lines, 
                         <span id="cutting-lines">0</span> cutting lines, 
-                        <span id="footer-lines">0</span> footer lines
+                        <span id="footer-lines">0</span> footer lines<br>
+                        <span id="tool-groups-info"></span>
                     </div>
                 </div>
             </div>
@@ -479,6 +481,10 @@
                     <div class="stat-label">Total Items</div>
                 </div>
                 <div class="stat">
+                    <div class="stat-value" id="stat-tools">0</div>
+                    <div class="stat-label">Tool Groups</div>
+                </div>
+                <div class="stat">
                     <div class="stat-value" id="stat-spacing-x">0"</div>
                     <div class="stat-label">X Spacing</div>
                 </div>
@@ -544,15 +550,20 @@
             
             parsedData = parseAndSeparateGcode(gcode);
             
+            const totalCuttingLines = parsedData.toolGroups.reduce((sum, g) => sum + g.lines.length, 0);
+            const toolInfo = parsedData.toolGroups.map(g => `T${g.toolNum}`).join(', ');
+            
             document.getElementById('section-info').style.display = 'block';
             document.getElementById('header-lines').textContent = parsedData.header.length;
-            document.getElementById('cutting-lines').textContent = parsedData.cutting.length;
+            document.getElementById('cutting-lines').textContent = totalCuttingLines;
             document.getElementById('footer-lines').textContent = parsedData.footer.length;
+            document.getElementById('tool-groups-info').textContent = 
+                `${parsedData.toolGroups.length} tool group(s): ${toolInfo || 'T1'}`;
             
             // Update tool diameter if detected
-            if (parsedData.toolDiameter) {
-                document.getElementById('tool-dia').value = parsedData.toolDiameter;
-                document.getElementById('tool-detected').textContent = '(detected)';
+            if (parsedData.maxToolDiameter) {
+                document.getElementById('tool-dia').value = parsedData.maxToolDiameter;
+                document.getElementById('tool-detected').textContent = '(max detected)';
             } else {
                 document.getElementById('tool-detected').textContent = '';
             }
@@ -562,9 +573,9 @@
             const lines = gcode.split('\n');
             const result = {
                 header: [],
-                cutting: [],
+                toolGroups: [], // Array of { toolNum, toolDia, lines[] }
                 footer: [],
-                toolDiameter: null,
+                maxToolDiameter: null,
                 retractHeight: 0.2,
                 variables: {}
             };
@@ -574,15 +585,9 @@
             let lastCuttingIndex = -1;
             let hasSeenMovement = false;
             
-            // First pass: detect tool diameter and find cutting section
+            // First pass: detect cutting section boundaries
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
-                
-                // Detect tool diameter from comment
-                const toolMatch = line.match(/D\s*=\s*(\d*\.?\d+)/i);
-                if (toolMatch && !result.toolDiameter) {
-                    result.toolDiameter = parseFloat(toolMatch[1]);
-                }
                 
                 // Detect retract height from G0 Z moves
                 const retractMatch = line.match(/G0.*Z\s*(\d*\.?\d+)/i);
@@ -593,7 +598,7 @@
                     }
                 }
                 
-                // Check for cutting moves (G1, G2, G3 with Z going negative or X/Y movement)
+                // Check for cutting moves
                 const isCuttingMove = /G[123]\s/i.test(line) || 
                     (/^[XYZ]/i.test(line.trim()) && hasSeenMovement);
                 
@@ -608,48 +613,116 @@
                 }
             }
             
-            // Second pass: separate sections
+            // Second pass: separate into header, tool groups, and footer
             hasSeenMovement = false;
             let reachedCutting = false;
+            let currentToolNum = 1;
+            let currentToolDia = null;
+            let currentToolLines = [];
+            let pendingToolChange = null;
             
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
+                const trimmedLine = line.trim();
                 
                 const isMovement = /[GXY]/i.test(line);
                 if (isMovement) hasSeenMovement = true;
                 
                 const isCuttingMove = /G[123]\s/i.test(line) || 
-                    (/^[XYZ]/i.test(line.trim()) && hasSeenMovement);
+                    (/^[XYZ]/i.test(trimmedLine) && hasSeenMovement);
                 
-                // Handle variable assignments in header
+                // Handle variable assignments
                 const varAssign = line.match(/#(\d+)\s*=\s*(.+)/);
                 if (varAssign) {
                     result.variables[varAssign[1]] = varAssign[2].trim();
                 }
                 
+                // Detect tool change (T command or M6)
+                const toolMatch = trimmedLine.match(/^T(\d+)/i) || trimmedLine.match(/\bT(\d+)\b/i);
+                const toolDiaMatch = line.match(/D\s*=\s*(\d*\.?\d+)/i);
+                
+                if (toolMatch) {
+                    pendingToolChange = parseInt(toolMatch[1]);
+                }
+                
+                if (toolDiaMatch) {
+                    const dia = parseFloat(toolDiaMatch[1]);
+                    if (!result.maxToolDiameter || dia > result.maxToolDiameter) {
+                        result.maxToolDiameter = dia;
+                    }
+                    if (pendingToolChange !== null || currentToolDia === null) {
+                        currentToolDia = dia;
+                    }
+                }
+                
                 if (!reachedCutting && isCuttingMove && !/G53/i.test(line)) {
                     reachedCutting = true;
+                    // Apply any pending tool info
+                    if (pendingToolChange !== null) {
+                        currentToolNum = pendingToolChange;
+                        pendingToolChange = null;
+                    }
                 }
                 
                 if (!reachedCutting) {
                     result.header.push(line);
                 } else if (i <= lastCuttingIndex) {
-                    result.cutting.push(line);
+                    // Check if this is a new tool change within cutting section
+                    const isToolChange = /^T\d+/i.test(trimmedLine) || /\bM6\b/i.test(trimmedLine);
+                    
+                    if (isToolChange && currentToolLines.length > 0) {
+                        // Save current tool group
+                        result.toolGroups.push({
+                            toolNum: currentToolNum,
+                            toolDia: currentToolDia,
+                            lines: [...currentToolLines]
+                        });
+                        currentToolLines = [];
+                        
+                        // Start new tool
+                        if (toolMatch) {
+                            currentToolNum = parseInt(toolMatch[1]);
+                        }
+                        currentToolDia = null;
+                    }
+                    
+                    // Update tool diameter if found on this line
+                    if (toolDiaMatch) {
+                        currentToolDia = parseFloat(toolDiaMatch[1]);
+                    }
+                    
+                    currentToolLines.push(line);
                 } else {
                     result.footer.push(line);
                 }
             }
             
-            // If we captured M5, M9, M30 in cutting, move to footer
-            while (result.cutting.length > 0) {
-                const lastLine = result.cutting[result.cutting.length - 1].trim().toUpperCase();
-                if (lastLine.startsWith('M5') || lastLine.startsWith('M9') || 
-                    lastLine.startsWith('M30') || lastLine === '%' ||
-                    lastLine.startsWith('G53')) {
-                    result.footer.unshift(result.cutting.pop());
-                } else {
-                    break;
+            // Save final tool group
+            if (currentToolLines.length > 0) {
+                // Clean up: move M5, M9, M30, G53, % from end of cutting to footer
+                while (currentToolLines.length > 0) {
+                    const lastLine = currentToolLines[currentToolLines.length - 1].trim().toUpperCase();
+                    if (lastLine.startsWith('M5') || lastLine.startsWith('M9') || 
+                        lastLine.startsWith('M30') || lastLine === '%' ||
+                        lastLine.startsWith('G53')) {
+                        result.footer.unshift(currentToolLines.pop());
+                    } else {
+                        break;
+                    }
                 }
+                
+                if (currentToolLines.length > 0) {
+                    result.toolGroups.push({
+                        toolNum: currentToolNum,
+                        toolDia: currentToolDia,
+                        lines: currentToolLines
+                    });
+                }
+            }
+            
+            // If no tool diameter detected, use default
+            if (!result.maxToolDiameter) {
+                result.maxToolDiameter = 0.0625;
             }
             
             return result;
@@ -791,12 +864,15 @@
             const toolDia = parseFloat(document.getElementById('tool-dia').value) || 0.0625;
             const margin = parseFloat(document.getElementById('margin').value) || 0.010;
             
+            // Get all cutting lines to calculate bounds
+            const allCuttingLines = parsedData.toolGroups.flatMap(g => g.lines);
+            
             // Parse original cutting paths to get bounds
-            const originalResult = parseGcodeForPaths(parsedData.cutting, 0, 0, parsedData.variables);
+            const originalResult = parseGcodeForPaths(allCuttingLines, 0, 0, parsedData.variables);
             const originalPaths = originalResult.paths;
             const originalBounds = calculatePathBounds(originalPaths);
             
-            // Calculate spacing
+            // Calculate spacing using max tool diameter
             const itemWidth = originalBounds.maxX - originalBounds.minX;
             const itemHeight = originalBounds.maxY - originalBounds.minY;
             const spacingX = itemWidth + toolDia + margin;
@@ -812,41 +888,77 @@
             outputLines.push('');
             outputLines.push(`(PATTERN: ${xCount} x ${yCount} = ${xCount * yCount} items)`);
             outputLines.push(`(SPACING: X=${spacingX.toFixed(4)}" Y=${spacingY.toFixed(4)}")`);
+            outputLines.push(`(TOOL GROUPS: ${parsedData.toolGroups.length} - Operations grouped by tool)`);
             outputLines.push('');
             
-            let itemNum = 0;
+            const totalItems = xCount * yCount;
+            
+            // Generate item positions
+            const itemPositions = [];
             for (let row = 0; row < yCount; row++) {
                 for (let col = 0; col < xCount; col++) {
-                    itemNum++;
-                    const offsetX = col * spacingX * xDir;
-                    const offsetY = row * spacingY * yDir;
+                    itemPositions.push({
+                        col: col + 1,
+                        row: row + 1,
+                        offsetX: col * spacingX * xDir,
+                        offsetY: row * spacingY * yDir
+                    });
+                }
+            }
+            
+            // Store bounds for each item (for preview)
+            for (const pos of itemPositions) {
+                itemBounds.push({
+                    minX: originalBounds.minX + pos.offsetX,
+                    maxX: originalBounds.maxX + pos.offsetX,
+                    minY: originalBounds.minY + pos.offsetY,
+                    maxY: originalBounds.maxY + pos.offsetY
+                });
+            }
+            
+            // Iterate by TOOL first, then by ITEM
+            for (let toolIdx = 0; toolIdx < parsedData.toolGroups.length; toolIdx++) {
+                const toolGroup = parsedData.toolGroups[toolIdx];
+                
+                outputLines.push(`(========================================)`);
+                outputLines.push(`(TOOL GROUP ${toolIdx + 1}: T${toolGroup.toolNum}${toolGroup.toolDia ? ` D=${toolGroup.toolDia}` : ''})`);
+                outputLines.push(`(Running on all ${totalItems} items before next tool)`);
+                outputLines.push(`(========================================)`);
+                outputLines.push('');
+                
+                // Run this tool's operations on ALL items
+                for (let itemIdx = 0; itemIdx < itemPositions.length; itemIdx++) {
+                    const pos = itemPositions[itemIdx];
+                    const itemNum = itemIdx + 1;
                     
-                    // Add comment for this item
-                    outputLines.push(`(--- ITEM ${itemNum}: COL ${col + 1}, ROW ${row + 1} ---)`);
+                    outputLines.push(`(--- T${toolGroup.toolNum} - ITEM ${itemNum}: COL ${pos.col}, ROW ${pos.row} ---)`);
                     
-                    // Generate offset G-code
-                    for (const line of parsedData.cutting) {
-                        const offsetLine = offsetGcodeLine(line, offsetX, offsetY, parsedData.variables);
+                    // Generate offset G-code for this tool group
+                    for (const line of toolGroup.lines) {
+                        // Skip tool change commands within the group (already handled at group level)
+                        const trimmed = line.trim().toUpperCase();
+                        if (trimmed.startsWith('T') && /^T\d+/.test(trimmed)) continue;
+                        if (trimmed === 'M6') continue;
+                        
+                        const offsetLine = offsetGcodeLine(line, pos.offsetX, pos.offsetY, parsedData.variables);
                         outputLines.push(offsetLine);
                     }
                     
-                    // Add retract between items (except after last)
-                    if (itemNum < xCount * yCount) {
+                    // Add retract between items (except after last item in this tool group)
+                    if (itemIdx < itemPositions.length - 1) {
                         outputLines.push(`G0 Z${parsedData.retractHeight}`);
                     }
                     outputLines.push('');
                     
                     // Parse paths for preview
-                    const result = parseGcodeForPaths(parsedData.cutting, offsetX, offsetY, parsedData.variables);
+                    const result = parseGcodeForPaths(toolGroup.lines, pos.offsetX, pos.offsetY, parsedData.variables);
                     allPaths.push(...result.paths);
-                    
-                    // Store item bounds for preview
-                    itemBounds.push({
-                        minX: originalBounds.minX + offsetX,
-                        maxX: originalBounds.maxX + offsetX,
-                        minY: originalBounds.minY + offsetY,
-                        maxY: originalBounds.maxY + offsetY
-                    });
+                }
+                
+                // Add retract before next tool change (if not last tool)
+                if (toolIdx < parsedData.toolGroups.length - 1) {
+                    outputLines.push(`G0 Z${parsedData.retractHeight}`);
+                    outputLines.push('');
                 }
             }
             
@@ -860,6 +972,7 @@
             document.getElementById('stat-total').textContent = xCount * yCount;
             document.getElementById('stat-spacing-x').textContent = spacingX.toFixed(3) + '"';
             document.getElementById('stat-spacing-y').textContent = spacingY.toFixed(3) + '"';
+            document.getElementById('stat-tools').textContent = parsedData.toolGroups.length;
             
             const totalWidth = (xCount - 1) * spacingX + itemWidth;
             const totalHeight = (yCount - 1) * spacingY + itemHeight;
@@ -879,7 +992,7 @@
             panY = 0;
             redraw();
             
-            showStatus(`Generated pattern: ${xCount} × ${yCount} = ${xCount * yCount} items`, 'success');
+            showStatus(`Generated pattern: ${xCount} × ${yCount} = ${xCount * yCount} items, ${parsedData.toolGroups.length} tool group(s)`, 'success');
         }
 
         function offsetGcodeLine(line, offsetX, offsetY, variables) {
@@ -1203,6 +1316,7 @@
             redraw();
             
             document.getElementById('stat-total').textContent = '0';
+            document.getElementById('stat-tools').textContent = '0';
             document.getElementById('stat-spacing-x').textContent = '0"';
             document.getElementById('stat-spacing-y').textContent = '0"';
             document.getElementById('stat-width').textContent = '0"';
