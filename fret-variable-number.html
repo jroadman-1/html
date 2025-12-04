@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fret G-Code Generator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        h1 {
+            text-align: center;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        .settings-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .setting {
+            background: #252542;
+            padding: 15px 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .setting label {
+            color: #aaa;
+            font-size: 14px;
+        }
+        .setting input {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 14px;
+            text-align: center;
+        }
+        .setting-primary {
+            background: #1a3a4a;
+            border: 2px solid #00d4ff;
+        }
+        .setting-primary input {
+            width: 80px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .set-frets-btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: #00d4ff;
+            color: #1a1a2e;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .set-frets-btn:hover {
+            background: #00b8e6;
+        }
+        .fret-section {
+            display: none;
+        }
+        .fret-section.visible {
+            display: block;
+        }
+        .fret-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        .fret-input {
+            background: #252542;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .fret-input label {
+            display: block;
+            color: #00d4ff;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .fret-input input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 16px;
+            text-align: center;
+        }
+        .fret-input input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .fret-input input.has-value {
+            border-color: #00cc66;
+            background: #1a2a1a;
+        }
+        .fret-input input.empty-required {
+            border-color: #ff4757;
+            background: #2a1a1a;
+        }
+        .buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .generate-btn {
+            background: #00d4ff;
+            color: #1a1a2e;
+            font-weight: bold;
+        }
+        .generate-btn:hover {
+            background: #00b8e6;
+            transform: translateY(-2px);
+        }
+        .copy-btn {
+            background: #00cc66;
+            color: #fff;
+        }
+        .copy-btn:hover {
+            background: #00b359;
+        }
+        .clear-btn {
+            background: #ff4757;
+            color: #fff;
+        }
+        .clear-btn:hover {
+            background: #e6404f;
+        }
+        .download-btn {
+            background: #9b59b6;
+            color: #fff;
+        }
+        .download-btn:hover {
+            background: #8e44ad;
+        }
+        .output-section {
+            background: #252542;
+            border-radius: 8px;
+            padding: 20px;
+            display: none;
+        }
+        .output-section.visible {
+            display: block;
+        }
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .output-header h2 {
+            margin: 0;
+            color: #00d4ff;
+        }
+        .fret-count {
+            background: #1a1a2e;
+            padding: 8px 15px;
+            border-radius: 20px;
+            color: #00cc66;
+            font-size: 14px;
+        }
+        #gcode-output {
+            width: 100%;
+            height: 500px;
+            background: #0a0a15;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            padding: 15px;
+            resize: vertical;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .status.success {
+            display: block;
+            background: #1a3a1a;
+            color: #00cc66;
+        }
+        .status.error {
+            display: block;
+            background: #3a1a1a;
+            color: #ff4757;
+        }
+        .info-box {
+            background: #1a2a3a;
+            border-left: 4px solid #00d4ff;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 0 8px 8px 0;
+            font-size: 14px;
+            color: #aaa;
+        }
+        .info-box strong {
+            color: #00d4ff;
+        }
+        .step-indicator {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .step {
+            display: inline-block;
+            padding: 8px 20px;
+            margin: 0 5px;
+            border-radius: 20px;
+            background: #252542;
+            color: #666;
+            font-size: 14px;
+        }
+        .step.active {
+            background: #00d4ff;
+            color: #1a1a2e;
+            font-weight: bold;
+        }
+        .step.complete {
+            background: #00cc66;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fret G-Code Generator</h1>
+    <p class="subtitle">Generate G-code for cutting frets with pauses between each for blank swapping</p>
+
+    <div class="info-box">
+        <strong>Workflow:</strong> Set number of frets → Enter widths → Generate G-code → Run on CNC. 
+        The machine will cut each fret, return to home, and pause (M0). Swap the blank and press Cycle Start to continue.
+        Spindle and coolant stay on throughout.
+    </div>
+
+    <div class="step-indicator">
+        <span class="step active" id="step1">1. Set Count</span>
+        <span class="step" id="step2">2. Enter Widths</span>
+        <span class="step" id="step3">3. Generate</span>
+    </div>
+
+    <div class="settings-row">
+        <div class="setting setting-primary">
+            <label>Number of Frets:</label>
+            <input type="number" id="fret-count-input" value="" min="1" max="50" placeholder="#">
+        </div>
+        <button class="set-frets-btn" onclick="setFretCount()">Set Fret Count</button>
+        <div class="setting">
+            <label>Endmill Diameter:</label>
+            <input type="number" id="endmill-dia" value="0.0625" step="0.001" min="0.001">
+            <span>in</span>
+        </div>
+    </div>
+
+    <div class="fret-section" id="fret-section">
+        <div class="fret-grid" id="fret-grid">
+            <!-- Fret inputs will be generated here -->
+        </div>
+
+        <div class="buttons">
+            <button class="generate-btn" onclick="generateGcode()">Generate G-Code</button>
+            <button class="copy-btn" onclick="copyGcode()">Copy to Clipboard</button>
+            <button class="download-btn" onclick="downloadGcode()">Download .nc File</button>
+            <button class="clear-btn" onclick="clearWidths()">Clear Widths</button>
+        </div>
+    </div>
+
+    <div class="output-section" id="output-section">
+        <div class="output-header">
+            <h2>Generated G-Code</h2>
+            <span class="fret-count" id="fret-status">Ready</span>
+        </div>
+        <textarea id="gcode-output" readonly placeholder="Enter fret widths above and click Generate G-Code..."></textarea>
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        let fretCount = 0;
+
+        function setFretCount() {
+            const countInput = document.getElementById('fret-count-input');
+            const count = parseInt(countInput.value);
+            
+            if (!count || count < 1) {
+                showStatus('Please enter a valid number of frets (1 or more).', 'error');
+                return;
+            }
+            
+            if (count > 50) {
+                showStatus('Maximum 50 frets allowed.', 'error');
+                return;
+            }
+            
+            fretCount = count;
+            generateFretInputs(count);
+            
+            // Update steps
+            document.getElementById('step1').className = 'step complete';
+            document.getElementById('step2').className = 'step active';
+            
+            // Show sections
+            document.getElementById('fret-section').classList.add('visible');
+            document.getElementById('output-section').classList.add('visible');
+            
+            // Focus first input
+            setTimeout(() => {
+                document.getElementById('fret-1').focus();
+            }, 100);
+            
+            showStatus(`${count} fret input${count !== 1 ? 's' : ''} created. Enter widths below.`, 'success');
+        }
+
+        function generateFretInputs(count) {
+            const grid = document.getElementById('fret-grid');
+            grid.innerHTML = '';
+            
+            for (let i = 1; i <= count; i++) {
+                const div = document.createElement('div');
+                div.className = 'fret-input';
+                div.innerHTML = `
+                    <label>Fret ${i}</label>
+                    <input type="number" id="fret-${i}" step="0.001" min="0" placeholder="Width" 
+                           oninput="updateInputStyle(this)" 
+                           onkeydown="handleKeyDown(event, ${i}, ${count})">
+                `;
+                grid.appendChild(div);
+            }
+            
+            updateFretStatus();
+        }
+
+        function handleKeyDown(event, currentFret, totalFrets) {
+            if (event.key === 'Enter' || event.key === 'Tab') {
+                if (!event.shiftKey && currentFret < totalFrets) {
+                    event.preventDefault();
+                    document.getElementById(`fret-${currentFret + 1}`).focus();
+                }
+            }
+        }
+
+        function updateInputStyle(input) {
+            if (input.value && parseFloat(input.value) > 0) {
+                input.classList.add('has-value');
+                input.classList.remove('empty-required');
+            } else {
+                input.classList.remove('has-value');
+            }
+            updateFretStatus();
+        }
+
+        function updateFretStatus() {
+            let filled = 0;
+            for (let i = 1; i <= fretCount; i++) {
+                const input = document.getElementById(`fret-${i}`);
+                if (input) {
+                    const val = parseFloat(input.value);
+                    if (val > 0) filled++;
+                }
+            }
+            document.getElementById('fret-status').textContent = `${filled}/${fretCount} widths entered`;
+        }
+
+        function generateGcode() {
+            if (fretCount === 0) {
+                showStatus('Please set the number of frets first.', 'error');
+                return;
+            }
+            
+            const endmillDia = parseFloat(document.getElementById('endmill-dia').value) || 0.0625;
+            const endmillRadius = endmillDia / 2;
+            
+            // Collect fret widths and validate
+            const frets = [];
+            let hasEmpty = false;
+            
+            for (let i = 1; i <= fretCount; i++) {
+                const input = document.getElementById(`fret-${i}`);
+                const val = parseFloat(input.value);
+                
+                if (!val || val <= 0) {
+                    input.classList.add('empty-required');
+                    hasEmpty = true;
+                } else {
+                    input.classList.remove('empty-required');
+                    frets.push({ num: i, width: val });
+                }
+            }
+
+            if (hasEmpty) {
+                showStatus('Please fill in all fret widths (highlighted in red).', 'error');
+                return;
+            }
+
+            // Update steps
+            document.getElementById('step2').className = 'step complete';
+            document.getElementById('step3').className = 'step active';
+
+            let gcode = [];
+            
+            // Header
+            gcode.push('%');
+            gcode.push(`(FRET CUTTING - ${frets.length} FRETS)`);
+            gcode.push(`(ENDMILL DIA: ${endmillDia})`);
+            gcode.push(`(T10 D=${endmillDia} CR=0. - ZMIN=-0.145 - FLAT END MILL)`);
+            gcode.push('N10 G90 G94 G17 G91.1');
+            gcode.push('N15 G20');
+            gcode.push('N20 G53 G0 Z-.05');
+            gcode.push('(2D CONTOUR)');
+            gcode.push('N25 T10 M6');
+            gcode.push('N30 S20000 M3');
+            gcode.push('N35 G17 G90 G94');
+            gcode.push('N40 G54');
+            gcode.push('N45 G64');
+            gcode.push('N50 M8');
+            gcode.push('');
+
+            // Generate code for each fret
+            frets.forEach((fret, index) => {
+                const isLast = index === frets.length - 1;
+                
+                gcode.push(`(--- FRET ${fret.num} - WIDTH ${fret.width} ---)`);
+                gcode.push(`#1=${fret.width}`);
+                gcode.push('#1=[#1/2]');
+                gcode.push(`#1=[#1+${endmillRadius.toFixed(4)}]`);
+                gcode.push('');
+                
+                // Left side cut
+                gcode.push('G0 X-#1 Y-0.0011');
+                gcode.push('G0 Z0.2');
+                gcode.push('G1 Z0.0125 F10.');
+                gcode.push('Z0.01');
+                gcode.push('Y0.0625 Z0.0078');
+                gcode.push('Y-0.0625 Z0.0034');
+                gcode.push('Y0.0625 Z-0.001');
+                gcode.push('Y-0.0625 Z-0.0053');
+                gcode.push('Y0.0625 Z-0.0097');
+                gcode.push('Y-0.0625 Z-0.014');
+                gcode.push('Y0.0625 Z-0.0184');
+                gcode.push('Y-0.0625 Z-0.0228');
+                gcode.push('Y0.0625 Z-0.0271');
+                gcode.push('Y-0.0625 Z-0.0315');
+                gcode.push('Y0.0625 Z-0.0359');
+                gcode.push('Y-0.0625 Z-0.0402');
+                gcode.push('Y0.0625 Z-0.0446');
+                gcode.push('Y-0.0625 Z-0.049');
+                gcode.push('Y0.0625 Z-0.0533');
+                gcode.push('Y-0.0625 Z-0.0577');
+                gcode.push('Y0.0625 Z-0.0621');
+                gcode.push('Y-0.0625 Z-0.0664');
+                gcode.push('Y0.0625 Z-0.0708');
+                gcode.push('Y-0.0625 Z-0.0752');
+                gcode.push('Y0.0625 Z-0.0795');
+                gcode.push('Y-0.0625 Z-0.0839');
+                gcode.push('Y0.0625 Z-0.0883');
+                gcode.push('Y-0.0625 Z-0.0926');
+                gcode.push('Y0.0625 Z-0.097');
+                gcode.push('Y-0.0625 Z-0.1013');
+                gcode.push('Y0.0625 Z-0.1057');
+                gcode.push('Y-0.0625 Z-0.1101');
+                gcode.push('Y0.0625 Z-0.1144');
+                gcode.push('Y-0.0625 Z-0.1188');
+                gcode.push('Y0.0625 Z-0.1232');
+                gcode.push('Y-0.0625 Z-0.1275');
+                gcode.push('Y0.0625 Z-0.1319');
+                gcode.push('Y-0.0625 Z-0.1363');
+                gcode.push('Y0.0625 Z-0.1406');
+                gcode.push('Y-0.0625 Z-0.145');
+                gcode.push('Y0.0625');
+                gcode.push('G0 Z0.2');
+                
+                // Right side cut
+                gcode.push('X#1 Y0.0011');
+                gcode.push('G1 Z0.0125 F10.');
+                gcode.push('Z0.01');
+                gcode.push('Y-0.0625 Z0.0078');
+                gcode.push('Y0.0625 Z0.0034');
+                gcode.push('Y-0.0625 Z-0.001');
+                gcode.push('Y0.0625 Z-0.0053');
+                gcode.push('Y-0.0625 Z-0.0097');
+                gcode.push('Y0.0625 Z-0.014');
+                gcode.push('Y-0.0625 Z-0.0184');
+                gcode.push('Y0.0625 Z-0.0228');
+                gcode.push('Y-0.0625 Z-0.0271');
+                gcode.push('Y0.0625 Z-0.0315');
+                gcode.push('Y-0.0625 Z-0.0359');
+                gcode.push('Y0.0625 Z-0.0402');
+                gcode.push('Y-0.0625 Z-0.0446');
+                gcode.push('Y0.0625 Z-0.049');
+                gcode.push('Y-0.0625 Z-0.0533');
+                gcode.push('Y0.0625 Z-0.0577');
+                gcode.push('Y-0.0625 Z-0.0621');
+                gcode.push('Y0.0625 Z-0.0664');
+                gcode.push('Y-0.0625 Z-0.0708');
+                gcode.push('Y0.0625 Z-0.0752');
+                gcode.push('Y-0.0625 Z-0.0795');
+                gcode.push('Y0.0625 Z-0.0839');
+                gcode.push('Y-0.0625 Z-0.0883');
+                gcode.push('Y0.0625 Z-0.0926');
+                gcode.push('Y-0.0625 Z-0.097');
+                gcode.push('Y0.0625 Z-0.1013');
+                gcode.push('Y-0.0625 Z-0.1057');
+                gcode.push('Y0.0625 Z-0.1101');
+                gcode.push('Y-0.0625 Z-0.1144');
+                gcode.push('Y0.0625 Z-0.1188');
+                gcode.push('Y-0.0625 Z-0.1232');
+                gcode.push('Y0.0625 Z-0.1275');
+                gcode.push('Y-0.0625 Z-0.1319');
+                gcode.push('Y0.0625 Z-0.1363');
+                gcode.push('Y-0.0625 Z-0.1406');
+                gcode.push('Y0.0625 Z-0.145');
+                gcode.push('Y-0.0625');
+                gcode.push('G0 Z0.6');
+                
+                // Return to home and pause (except after last fret)
+                gcode.push('G53 G0 Z-.05');
+                
+                if (!isLast) {
+                    gcode.push(`(PAUSE - SWAP FRET BLANK - NEXT: FRET ${frets[index + 1].num})`);
+                    gcode.push('M0');
+                }
+                
+                gcode.push('');
+            });
+
+            // Footer
+            gcode.push('(--- PROGRAM COMPLETE ---)');
+            gcode.push('M5');
+            gcode.push('M9');
+            gcode.push('G53 G0 Z-.05');
+            gcode.push('M30');
+            gcode.push('%');
+
+            document.getElementById('gcode-output').value = gcode.join('\n');
+            document.getElementById('fret-status').textContent = `${frets.length} frets generated`;
+            showStatus(`G-code generated for ${frets.length} fret${frets.length !== 1 ? 's' : ''}.`, 'success');
+        }
+
+        function copyGcode() {
+            const output = document.getElementById('gcode-output');
+            if (!output.value) {
+                showStatus('No G-code to copy. Generate first.', 'error');
+                return;
+            }
+            navigator.clipboard.writeText(output.value).then(() => {
+                showStatus('G-code copied to clipboard!', 'success');
+            });
+        }
+
+        function downloadGcode() {
+            const output = document.getElementById('gcode-output');
+            if (!output.value) {
+                showStatus('No G-code to download. Generate first.', 'error');
+                return;
+            }
+            const blob = new Blob([output.value], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `fret-cutting-${fretCount}.nc`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showStatus(`File downloaded as fret-cutting-${fretCount}.nc`, 'success');
+        }
+
+        function clearWidths() {
+            for (let i = 1; i <= fretCount; i++) {
+                const input = document.getElementById(`fret-${i}`);
+                if (input) {
+                    input.value = '';
+                    input.classList.remove('has-value');
+                    input.classList.remove('empty-required');
+                }
+            }
+            document.getElementById('gcode-output').value = '';
+            updateFretStatus();
+            
+            // Reset step 3
+            document.getElementById('step2').className = 'step active';
+            document.getElementById('step3').className = 'step';
+            
+            showStatus('All widths cleared.', 'success');
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            setTimeout(() => {
+                status.className = 'status';
+            }, 3000);
+        }
+
+        // Allow Enter key to set fret count
+        document.getElementById('fret-count-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                setFretCount();
+            }
+        });
+    </script>
+</body>
+</html>
