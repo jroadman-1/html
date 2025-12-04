@@ -451,13 +451,15 @@
             const width = rect.width;
             const height = rect.height;
             
-            const rangeX = (bounds.maxX - bounds.minX) / zoom;
-            const rangeY = (bounds.maxY - bounds.minY) / zoom;
+            const scale = getUniformScale(width, height);
+            const viewRangeX = width / scale;
+            const viewRangeY = height / scale;
             
-            // Determine grid spacing
+            // Determine grid spacing based on visible range
+            const maxRange = Math.max(viewRangeX, viewRangeY);
             let gridSize = 0.1;
             const maxGridLines = 20;
-            while (rangeX / gridSize > maxGridLines || rangeY / gridSize > maxGridLines) {
+            while (maxRange / gridSize > maxGridLines) {
                 gridSize *= 2;
             }
             
@@ -468,9 +470,9 @@
             const centerY = (bounds.minY + bounds.maxY) / 2 + panY;
             
             // Draw vertical lines
-            const startX = Math.floor((centerX - rangeX / 2) / gridSize) * gridSize;
-            for (let x = startX; x < centerX + rangeX / 2; x += gridSize) {
-                const screenX = worldToScreenX(x, width);
+            const startX = Math.floor((centerX - viewRangeX / 2) / gridSize) * gridSize;
+            for (let x = startX; x < centerX + viewRangeX / 2; x += gridSize) {
+                const screenX = worldToScreenX(x, width, height);
                 ctx.beginPath();
                 ctx.moveTo(screenX, 0);
                 ctx.lineTo(screenX, height);
@@ -478,9 +480,9 @@
             }
             
             // Draw horizontal lines
-            const startY = Math.floor((centerY - rangeY / 2) / gridSize) * gridSize;
-            for (let y = startY; y < centerY + rangeY / 2; y += gridSize) {
-                const screenY = worldToScreenY(y, height);
+            const startY = Math.floor((centerY - viewRangeY / 2) / gridSize) * gridSize;
+            for (let y = startY; y < centerY + viewRangeY / 2; y += gridSize) {
+                const screenY = worldToScreenY(y, width, height);
                 ctx.beginPath();
                 ctx.moveTo(0, screenY);
                 ctx.lineTo(width, screenY);
@@ -491,8 +493,8 @@
             ctx.strokeStyle = '#555';
             ctx.lineWidth = 1;
             
-            const originX = worldToScreenX(0, width);
-            const originY = worldToScreenY(0, height);
+            const originX = worldToScreenX(0, width, height);
+            const originY = worldToScreenY(0, width, height);
             
             if (originX >= 0 && originX <= width) {
                 ctx.beginPath();
@@ -509,16 +511,33 @@
             }
         }
 
-        function worldToScreenX(x, width) {
-            const centerX = (bounds.minX + bounds.maxX) / 2 + panX;
-            const rangeX = (bounds.maxX - bounds.minX) / zoom;
-            return ((x - centerX) / rangeX + 0.5) * width;
+        function getUniformScale(width, height) {
+            const rangeX = bounds.maxX - bounds.minX;
+            const rangeY = bounds.maxY - bounds.minY;
+            
+            // Prevent division by zero
+            if (rangeX <= 0 || rangeY <= 0) {
+                return zoom * 100; // Default scale
+            }
+            
+            // Use the larger range to maintain aspect ratio
+            const scaleX = width / rangeX;
+            const scaleY = height / rangeY;
+            
+            // Pick the smaller scale so everything fits
+            return Math.min(scaleX, scaleY) * zoom;
         }
 
-        function worldToScreenY(y, height) {
+        function worldToScreenX(x, width, height) {
+            const centerX = (bounds.minX + bounds.maxX) / 2 + panX;
+            const scale = getUniformScale(width, height);
+            return (x - centerX) * scale + width / 2;
+        }
+
+        function worldToScreenY(y, width, height) {
             const centerY = (bounds.minY + bounds.maxY) / 2 + panY;
-            const rangeY = (bounds.maxY - bounds.minY) / zoom;
-            return (0.5 - (y - centerY) / rangeY) * height; // Flip Y
+            const scale = getUniformScale(width, height);
+            return -(y - centerY) * scale + height / 2; // Flip Y
         }
 
         function drawPaths() {
@@ -528,10 +547,10 @@
             const showRapids = document.getElementById('show-rapids').checked;
             
             for (const path of paths) {
-                const fromX = worldToScreenX(path.from.x, width);
-                const fromY = worldToScreenY(path.from.y, height);
-                const toX = worldToScreenX(path.to.x, width);
-                const toY = worldToScreenY(path.to.y, height);
+                const fromX = worldToScreenX(path.from.x, width, height);
+                const fromY = worldToScreenY(path.from.y, width, height);
+                const toX = worldToScreenX(path.to.x, width, height);
+                const toY = worldToScreenY(path.to.y, width, height);
                 
                 ctx.beginPath();
                 
@@ -551,8 +570,8 @@
                     
                     // Draw arc if we have center
                     if (path.center) {
-                        const centerScreenX = worldToScreenX(path.center.x, width);
-                        const centerScreenY = worldToScreenY(path.center.y, height);
+                        const centerScreenX = worldToScreenX(path.center.x, width, height);
+                        const centerScreenY = worldToScreenY(path.center.y, width, height);
                         const radius = Math.sqrt(
                             Math.pow(fromX - centerScreenX, 2) + 
                             Math.pow(fromY - centerScreenY, 2)
@@ -574,8 +593,8 @@
             
             // Draw start point
             if (paths.length > 0) {
-                const startX = worldToScreenX(paths[0].from.x, width);
-                const startY = worldToScreenY(paths[0].from.y, height);
+                const startX = worldToScreenX(paths[0].from.x, width, height);
+                const startY = worldToScreenY(paths[0].from.y, width, height);
                 ctx.beginPath();
                 ctx.arc(startX, startY, 6, 0, Math.PI * 2);
                 ctx.fillStyle = '#00d4ff';
@@ -583,8 +602,8 @@
                 
                 // Draw end point
                 const lastPath = paths[paths.length - 1];
-                const endX = worldToScreenX(lastPath.to.x, width);
-                const endY = worldToScreenY(lastPath.to.y, height);
+                const endX = worldToScreenX(lastPath.to.x, width, height);
+                const endY = worldToScreenY(lastPath.to.y, width, height);
                 ctx.beginPath();
                 ctx.arc(endX, endY, 6, 0, Math.PI * 2);
                 ctx.fillStyle = '#ff4757';
@@ -711,14 +730,15 @@
             if (!isDragging) return;
             
             const rect = canvas.getBoundingClientRect();
-            const dx = (e.clientX - lastMouseX) / rect.width;
-            const dy = (e.clientY - lastMouseY) / rect.height;
+            const width = rect.width;
+            const height = rect.height;
+            const scale = getUniformScale(width, height);
             
-            const rangeX = (bounds.maxX - bounds.minX) / zoom;
-            const rangeY = (bounds.maxY - bounds.minY) / zoom;
+            const dx = e.clientX - lastMouseX;
+            const dy = e.clientY - lastMouseY;
             
-            panX -= dx * rangeX;
-            panY += dy * rangeY; // Flip for Y
+            panX -= dx / scale;
+            panY += dy / scale; // Flip for Y
             
             lastMouseX = e.clientX;
             lastMouseY = e.clientY;
