@@ -471,6 +471,7 @@
                 <div class="legend-item"><div class="legend-line legend-rapid"></div> Rapid (G0)</div>
                 <div class="legend-item"><div class="legend-line legend-cut"></div> Cut (G1/G2/G3)</div>
                 <div class="legend-item"><div class="legend-line legend-original" style="border: 2px dashed #00d4ff; background: transparent;"></div> Item Bounds</div>
+                <div class="legend-item"><div style="width: 12px; height: 12px; background: #ffcc00; border-radius: 50%;"></div> Zero Point</div>
             </div>
             <div class="stats">
                 <div class="stat">
@@ -1049,6 +1050,42 @@
             ctx.setLineDash([]);
         }
 
+        function drawOrigin() {
+            const rect = canvas.getBoundingClientRect();
+            const width = rect.width;
+            const height = rect.height;
+            
+            const originX = worldToScreenX(0, width, height);
+            const originY = worldToScreenY(0, width, height);
+            
+            // Draw origin crosshair
+            ctx.strokeStyle = '#ffcc00';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
+            
+            const crossSize = 12;
+            ctx.beginPath();
+            ctx.moveTo(originX - crossSize, originY);
+            ctx.lineTo(originX + crossSize, originY);
+            ctx.moveTo(originX, originY - crossSize);
+            ctx.lineTo(originX, originY + crossSize);
+            ctx.stroke();
+            
+            // Draw origin dot
+            ctx.beginPath();
+            ctx.arc(originX, originY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffcc00';
+            ctx.fill();
+            ctx.strokeStyle = '#1a1a2e';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Label
+            ctx.fillStyle = '#ffcc00';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.fillText('ZERO', originX + 12, originY - 10);
+        }
+
         function drawPaths() {
             const rect = canvas.getBoundingClientRect();
             const width = rect.width;
@@ -1103,6 +1140,7 @@
             drawGrid();
             drawItemBounds();
             drawPaths();
+            drawOrigin();
         }
 
         function zoomIn() {
@@ -1237,6 +1275,7 @@
         window.addEventListener('resize', redraw);
         initCanvas();
         drawGrid();
+        drawOrigin();
     </script>
 </body>
 </html>
