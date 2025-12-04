@@ -400,6 +400,7 @@
       const [numColumns, setNumColumns] = useState('3');
       const [numRows, setNumRows] = useState('2');
       const [clearance, setClearance] = useState('0.01');
+      const [stockMargin, setStockMargin] = useState('0.05');
       
       // Tool parameters
       const [selectedTool, setSelectedTool] = useState('0.1875');
@@ -444,12 +445,18 @@
         // Spacing between dowel centers (based on bottom/large diameter)
         const spacing = dDiaBottom + (2 * tDia) + clr;
         
-        // Edge margin (from stock edge to first dowel center, based on bottom)
+        // Edge margin for toolpath (from stock edge to first dowel center)
         const edgeMargin = outerSweepBottom + (clr / 2);
         
-        // Minimum stock dimensions
-        const minStockX = (2 * edgeMargin) + ((cols - 1) * spacing);
-        const minStockY = (2 * edgeMargin) + ((rows - 1) * spacing);
+        // Stock margin (edge of stock to edge of dowel)
+        const stockMarg = parseFloat(stockMargin) || 0.05;
+        
+        // Minimum stock dimensions (just needs to contain dowels + small margin)
+        const minStockX = (2 * (rBottom + stockMarg)) + ((cols - 1) * spacing);
+        const minStockY = (2 * (rBottom + stockMarg)) + ((rows - 1) * spacing);
+        
+        // Stock edge margin for positioning first dowel center
+        const stockEdgeMargin = rBottom + stockMarg;
         
         // Number of passes for cutting
         const numPasses = Math.ceil(dLen / stepdown);
@@ -458,13 +465,13 @@
         // Total dowels
         const totalDowels = cols * rows;
         
-        // Generate dowel positions (zero at back-left top)
+        // Generate dowel positions (zero at back-left top, Y toward front is negative)
         const dowelPositions = [];
         for (let row = 0; row < rows; row++) {
           for (let col = 0; col < cols; col++) {
             dowelPositions.push({
-              x: edgeMargin + (col * spacing),
-              y: edgeMargin + (row * spacing),
+              x: stockEdgeMargin + (col * spacing),
+              y: stockEdgeMargin + (row * spacing),
               index: row * cols + col + 1
             });
           }
@@ -548,6 +555,7 @@
           outerSweepBottom,
           spacing,
           edgeMargin,
+          stockEdgeMargin,
           minStockX,
           minStockY,
           numPasses,
@@ -571,7 +579,7 @@
           totalTimeFormatted: formatTime(totalTime),
           cuttingTimeFormatted: formatTime(cuttingTime)
         };
-      }, [dowelDiameter, dowelLength, taperAngle, currentTool, numColumns, numRows, clearance, rapidRate, safeZ]);
+      }, [dowelDiameter, dowelLength, taperAngle, currentTool, numColumns, numRows, clearance, stockMargin, rapidRate, safeZ]);
 
       const updateToolSetting = (key, value) => {
         setToolSettings(prev => ({
@@ -640,11 +648,13 @@
         
         // Generate toolpath for each dowel
         dowelPositions.forEach((pos, idx) => {
-          gcode.push(`(DOWEL ${pos.index} AT X${pos.x.toFixed(4)} Y${pos.y.toFixed(4)})`);
+          // Negate Y so dowels go toward front (-Y) from back-left zero
+          const gcodeY = -pos.y;
+          gcode.push(`(DOWEL ${pos.index} AT X${pos.x.toFixed(4)} Y${gcodeY.toFixed(4)})`);
           
           // Rapid to start position (at top radius, on +X side)
           const startX = (pos.x + toolCenterRadiusTop).toFixed(4);
-          const startY = pos.y.toFixed(4);
+          const startY = gcodeY.toFixed(4);
           
           gcode.push(line(`G0 X${startX} Y${startY}`));
           if (idx === 0) {
@@ -737,7 +747,7 @@
                       <label>Top Diameter</label>
                       <div className="input-with-unit">
                         <input 
-                          type="number" 
+                          type="number" onWheel={(e) => e.target.blur()} 
                           step="0.001" 
                           value={dowelDiameter}
                           onChange={(e) => setDowelDiameter(e.target.value)}
@@ -749,7 +759,7 @@
                       <label>Length</label>
                       <div className="input-with-unit">
                         <input 
-                          type="number" 
+                          type="number" onWheel={(e) => e.target.blur()} 
                           step="0.001" 
                           value={dowelLength}
                           onChange={(e) => setDowelLength(e.target.value)}
@@ -762,7 +772,7 @@
                     <label>Taper Angle</label>
                     <div className="input-with-unit">
                       <input 
-                        type="number" 
+                        type="number" onWheel={(e) => e.target.blur()} 
                         step="0.5" 
                         min="0"
                         max="45"
@@ -780,7 +790,7 @@
                     <div className="input-group">
                       <label>Columns (X)</label>
                       <input 
-                        type="number" 
+                        type="number" onWheel={(e) => e.target.blur()} 
                         min="1"
                         max="20"
                         value={numColumns}
@@ -790,7 +800,7 @@
                     <div className="input-group">
                       <label>Rows (Y)</label>
                       <input 
-                        type="number" 
+                        type="number" onWheel={(e) => e.target.blur()} 
                         min="1"
                         max="20"
                         value={numRows}
@@ -802,11 +812,24 @@
                     <label>Clearance</label>
                     <div className="input-with-unit">
                       <input 
-                        type="number" 
+                        type="number" onWheel={(e) => e.target.blur()} 
                         step="0.01"
                         min="0"
                         value={clearance}
                         onChange={(e) => setClearance(e.target.value)}
+                      />
+                      <span className="input-unit">in</span>
+                    </div>
+                  </div>
+                  <div className="input-group" style={{marginTop: '12px'}}>
+                    <label>Stock Edge Margin</label>
+                    <div className="input-with-unit">
+                      <input 
+                        type="number" onWheel={(e) => e.target.blur()} 
+                        step="0.01"
+                        min="0"
+                        value={stockMargin}
+                        onChange={(e) => setStockMargin(e.target.value)}
                       />
                       <span className="input-unit">in</span>
                     </div>
@@ -841,7 +864,7 @@
                         <div className="input-group">
                           <label>Spindle RPM</label>
                           <input 
-                            type="number" 
+                            type="number" onWheel={(e) => e.target.blur()} 
                             value={currentTool.rpm}
                             onChange={(e) => updateToolSetting('rpm', e.target.value)}
                           />
@@ -850,7 +873,7 @@
                           <label>Feed Rate</label>
                           <div className="input-with-unit">
                             <input 
-                              type="number" 
+                              type="number" onWheel={(e) => e.target.blur()} 
                               value={currentTool.feed}
                               onChange={(e) => updateToolSetting('feed', e.target.value)}
                             />
@@ -863,7 +886,7 @@
                           <label>Stepdown/Rev</label>
                           <div className="input-with-unit">
                             <input 
-                              type="number" 
+                              type="number" onWheel={(e) => e.target.blur()} 
                               step="0.001"
                               value={currentTool.stepdown}
                               onChange={(e) => updateToolSetting('stepdown', e.target.value)}
@@ -874,7 +897,7 @@
                         <div className="input-group">
                           <label>Tool Number</label>
                           <input 
-                            type="number" 
+                            type="number" onWheel={(e) => e.target.blur()} 
                             value={toolNumber}
                             onChange={(e) => setToolNumber(e.target.value)}
                           />
@@ -884,7 +907,7 @@
                         <label>Safe Z Height</label>
                         <div className="input-with-unit">
                           <input 
-                            type="number" 
+                            type="number" onWheel={(e) => e.target.blur()} 
                             step="0.1"
                             value={safeZ}
                             onChange={(e) => setSafeZ(e.target.value)}
@@ -896,7 +919,7 @@
                         <label>Rapid Rate (for time est.)</label>
                         <div className="input-with-unit">
                           <input 
-                            type="number" 
+                            type="number" onWheel={(e) => e.target.blur()} 
                             step="10"
                             value={rapidRate}
                             onChange={(e) => setRapidRate(e.target.value)}
