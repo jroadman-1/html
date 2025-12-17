@@ -179,7 +179,7 @@
 <header>Shop Layout Planner</header>
 
 <div class="controls">
-  <!-- Row 1: Room + Rect -->
+  <!-- Row 1: Room -->
   <div class="controls-row">
     <div class="row-left">
       <label>Room W:</label>
@@ -192,8 +192,11 @@
       </select>
       <button id="applyRoomBtn">Apply Room</button>
     </div>
+  </div>
 
-    <div class="row-right">
+  <!-- Row 2: Rect + Circle -->
+  <div class="controls-row">
+    <div class="row-left">
       <label>Rect:</label>
       <input type="text" id="itemName" placeholder="Label" size="10">
       <label>W:</label>
@@ -201,10 +204,18 @@
       <label>D:</label>
       <input type="number" id="itemDepth" value="2" step="any">
       <button id="addItemBtn">Add Rect</button>
+      
+      <span class="toolbar-separator">|</span>
+      
+      <label>Circle:</label>
+      <input type="text" id="circleName" placeholder="Label" size="10">
+      <label>Dia:</label>
+      <input type="number" id="circleDiameter" value="2" step="any">
+      <button id="addCircleBtn">Add Circle</button>
     </div>
   </div>
 
-  <!-- Row 2: Save/Load/PDF + Circle -->
+  <!-- Row 3: Save/Load/PDF -->
   <div class="controls-row">
     <div class="row-left">
       <button id="downloadBtn">Download Work in Progress</button>
@@ -214,17 +225,9 @@
       <input type="text" id="pdfHeader" value="Shop Layout">
       <button id="pdfBtn">Save PDF</button>
     </div>
-
-    <div class="row-right">
-      <label>Circle:</label>
-      <input type="text" id="circleName" placeholder="Label" size="10">
-      <label>Dia:</label>
-      <input type="number" id="circleDiameter" value="2" step="any">
-      <button id="addCircleBtn">Add Circle</button>
-    </div>
   </div>
 
-  <!-- Row 3: Tools + Undo/Redo + Snap -->
+  <!-- Row 4: Tools + Undo/Redo + Snap -->
   <div class="controls-row">
     <div class="row-left">
       <label>Tool:</label>
@@ -241,7 +244,11 @@
 
       <button id="snapToggleBtn">Snap: On</button>
     </div>
-    <div class="row-right">
+  </div>
+  
+  <!-- Row 5: Wall Type -->
+  <div class="controls-row">
+    <div class="row-left">
       <label>Wall Type:</label>
       <label><input type="radio" name="wallType" value="interior" checked>Interior</label>
       <label><input type="radio" name="wallType" value="exterior">Exterior</label>
