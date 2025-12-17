@@ -58,6 +58,22 @@
   .row-right {
     flex: 0 1 auto;
   }
+  
+  .shapes-group {
+    flex-wrap: nowrap;
+    min-width: min-content;
+  }
+  
+  @media (max-width: 1200px) {
+    .shapes-group {
+      flex-wrap: wrap;
+      flex-basis: 100%;
+      order: 2;
+    }
+    .row-left {
+      order: 1;
+    }
+  }
 
   button, input, select {
     border-radius: 4px;
@@ -179,7 +195,7 @@
 <header>Shop Layout Planner</header>
 
 <div class="controls">
-  <!-- Row 1: Room -->
+  <!-- Row 1: Room + Rect/Circle on right -->
   <div class="controls-row">
     <div class="row-left">
       <label>Room W:</label>
@@ -192,11 +208,8 @@
       </select>
       <button id="applyRoomBtn">Apply Room</button>
     </div>
-  </div>
 
-  <!-- Row 2: Rect + Circle -->
-  <div class="controls-row">
-    <div class="row-left">
+    <div class="row-right shapes-group">
       <label>Rect:</label>
       <input type="text" id="itemName" placeholder="Label" size="10">
       <label>W:</label>
@@ -215,7 +228,7 @@
     </div>
   </div>
 
-  <!-- Row 3: Save/Load/PDF -->
+  <!-- Row 2: Save/Load/PDF -->
   <div class="controls-row">
     <div class="row-left">
       <button id="downloadBtn">Download Work in Progress</button>
@@ -227,7 +240,7 @@
     </div>
   </div>
 
-  <!-- Row 4: Tools + Undo/Redo + Snap -->
+  <!-- Row 3: Tools + Undo/Redo + Snap -->
   <div class="controls-row">
     <div class="row-left">
       <label>Tool:</label>
@@ -246,7 +259,7 @@
     </div>
   </div>
   
-  <!-- Row 5: Wall Type -->
+  <!-- Row 4: Wall Type -->
   <div class="controls-row">
     <div class="row-left">
       <label>Wall Type:</label>
