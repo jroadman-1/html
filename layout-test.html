@@ -563,11 +563,12 @@ function draw() {
 }
 
 function drawRoom(c, toCanvas, effScale) {
-  const tl = toCanvas(0,0);
-  const br = toCanvas(room.width, room.height);
-  c.strokeStyle = "#000";
-  c.lineWidth = 2;
-  c.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  // Room outline is drawn by perimeter walls, not needed here
+  // const tl = toCanvas(0,0);
+  // const br = toCanvas(room.width, room.height);
+  // c.strokeStyle = "#000";
+  // c.lineWidth = 2;
+  // c.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
 }
 
 function drawGrid(c, toCanvas) {
@@ -755,14 +756,18 @@ function drawDoorSymbol(c, toCanvas, wall, door) {
   const endAngle   = baseAngle + direction * sweep;
 
   c.save();
-  c.strokeStyle = "#444";
-  c.lineWidth = 1.4;
+  c.strokeStyle = "#888";
+  c.lineWidth = 1;
 
+  // Draw the door panel as a thin line to show door position
   c.beginPath();
   c.moveTo(hingeCanvas.x, hingeCanvas.y);
   c.lineTo(leafCanvas.x, leafCanvas.y);
   c.stroke();
 
+  // Draw the swing arc
+  c.strokeStyle = "#444";
+  c.lineWidth = 1.4;
   c.beginPath();
   c.arc(hingeCanvas.x, hingeCanvas.y, leafRadius,
         startAngle, endAngle, direction < 0);
