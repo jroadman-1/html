@@ -58,19 +58,29 @@
   
   .row-right {
     flex: 0 1 auto;
-    white-space: nowrap;
   }
   
-  /* When wrapping, keep row-right items together below row-left */
+  .shapes-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .shape-item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  
+  /* When wrapping, keep shapes-container together below room */
   @media (max-width: 1200px) {
-    .controls-row:nth-child(1) .row-right,
-    .controls-row:nth-child(2) .row-right {
+    .controls-row:nth-child(1) .shapes-container {
       order: 2;
       flex-basis: 100%;
     }
     
-    .controls-row:nth-child(1) .row-left,
-    .controls-row:nth-child(2) .row-left {
+    .controls-row:nth-child(1) .row-left {
       order: 1;
       flex-basis: 100%;
     }
@@ -196,7 +206,7 @@
 <header>Shop Layout Planner</header>
 
 <div class="controls">
-  <!-- Row 1: Room + Rect -->
+  <!-- Row 1: Room + Shapes (Rect + Circle grouped) -->
   <div class="controls-row">
     <div class="row-left">
       <label>Room W:</label>
@@ -210,18 +220,27 @@
       <button id="applyRoomBtn">Apply Room</button>
     </div>
 
-    <div class="row-right">
-      <label>Rect:</label>
-      <input type="text" id="itemName" placeholder="Label" size="10">
-      <label>W:</label>
-      <input type="number" id="itemWidth" value="3" step="any">
-      <label>D:</label>
-      <input type="number" id="itemDepth" value="2" step="any">
-      <button id="addItemBtn">Add Rect</button>
+    <div class="row-right shapes-container">
+      <div class="shape-item">
+        <label>Rect:</label>
+        <input type="text" id="itemName" placeholder="Label" size="10">
+        <label>W:</label>
+        <input type="number" id="itemWidth" value="3" step="any">
+        <label>D:</label>
+        <input type="number" id="itemDepth" value="2" step="any">
+        <button id="addItemBtn">Add Rect</button>
+      </div>
+      <div class="shape-item">
+        <label>Circle:</label>
+        <input type="text" id="circleName" placeholder="Label" size="10">
+        <label>Dia:</label>
+        <input type="number" id="circleDiameter" value="2" step="any">
+        <button id="addCircleBtn">Add Circle</button>
+      </div>
     </div>
   </div>
 
-  <!-- Row 2: Save/Load/PDF + Circle -->
+  <!-- Row 2: Save/Load/PDF -->
   <div class="controls-row">
     <div class="row-left">
       <button id="downloadBtn">Download Work in Progress</button>
@@ -230,14 +249,6 @@
       <label>PDF Header:</label>
       <input type="text" id="pdfHeader" value="Shop Layout">
       <button id="pdfBtn">Save PDF</button>
-    </div>
-
-    <div class="row-right">
-      <label>Circle:</label>
-      <input type="text" id="circleName" placeholder="Label" size="10">
-      <label>Dia:</label>
-      <input type="number" id="circleDiameter" value="2" step="any">
-      <button id="addCircleBtn">Add Circle</button>
     </div>
   </div>
 
