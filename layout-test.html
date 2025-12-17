@@ -707,6 +707,7 @@ function drawWallWithOpenings(c, toCanvas, wall, wallDoors, wallWindows) {
 }
 
 function drawDoorSymbol(c, toCanvas, wall, door) {
+  if (door.swing === "none") return;
   const x1 = wall.x1, y1 = wall.y1;
   const x2 = wall.x2, y2 = wall.y2;
   const dx = x2 - x1;
@@ -725,23 +726,6 @@ function drawDoorSymbol(c, toCanvas, wall, door) {
   const startY = y1 + dy * s;
   const endX   = x1 + dx * e;
   const endY   = y1 + dy * e;
-
-  // If no swing specified, draw a simple dashed line to indicate door opening
-  if (door.swing === "none") {
-    const startCanvas = toCanvas(startX, startY);
-    const endCanvas = toCanvas(endX, endY);
-    
-    c.save();
-    c.strokeStyle = door.id === selectedDoorId ? "#06c" : "#888";
-    c.lineWidth = 2;
-    c.setLineDash([4, 4]);
-    c.beginPath();
-    c.moveTo(startCanvas.x, startCanvas.y);
-    c.lineTo(endCanvas.x, endCanvas.y);
-    c.stroke();
-    c.restore();
-    return;
-  }
 
   let hingeX, hingeY, leafX, leafY;
   if (door.swing.endsWith("left")) {
@@ -771,7 +755,7 @@ function drawDoorSymbol(c, toCanvas, wall, door) {
   const endAngle   = baseAngle + direction * sweep;
 
   c.save();
-  c.strokeStyle = door.id === selectedDoorId ? "#06c" : "#444";
+  c.strokeStyle = "#444";
   c.lineWidth = 1.4;
 
   c.beginPath();
