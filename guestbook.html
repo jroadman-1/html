@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    
+    h1 { 
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+    
+    .subtitle {
+      color: #666;
+      margin-bottom: 25px;
+      font-size: 14px;
+    }
+    
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+    
+    input { 
+      flex: 1;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.2s;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    button { 
+      padding: 12px 24px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    button:hover {
+      background: #5568d3;
+    }
+    
+    button:active {
+      transform: scale(0.98);
+    }
+    
+    #names { 
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .name { 
+      padding: 15px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      animation: slideIn 0.3s ease;
+    }
+    
+    .name:last-child {
+      border-bottom: none;
+    }
+    
+    .name-text {
+      font-weight: 600;
+      color: #333;
+      font-size: 16px;
+    }
+    
+    .name-time {
+      color: #999;
+      font-size: 12px;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
+    }
+    
+    .count {
+      text-align: center;
+      margin-bottom: 15px;
+      color: #666;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>✨ Guest Book</h1>
+    <div class="subtitle">Sign in and see who else has visited!</div>
+    
+    <div class="input-group">
+      <input id="nameInput" placeholder="Enter your name" maxlength="50">
+      <button onclick="addName()">Sign</button>
+    </div>
+    
+    <div class="count" id="count"></div>
+    <div id="names"></div>
+  </div>
+
+  <script>
+    async function addName() {
+      const input = document.getElementById('nameInput');
+      const name = input.value.trim();
+      
+      if (!name) {
+        input.focus();
+        return;
+      }
+      
+      try {
+        // Get existing names
+        let names = [];
+        try {
+          const result = await window.storage.get('guestbook', true);
+          names = result ? JSON.parse(result.value) : [];
+        } catch(e) {
+          // Key doesn't exist yet, that's fine
+        }
+        
+        // Add new name with timestamp
+        names.push({ 
+          name, 
+          time: new Date().toLocaleString()
+        });
+        
+        // Save back (shared: true makes it visible to everyone)
+        await window.storage.set('guestbook', JSON.stringify(names), true);
+        
+        input.value = '';
+        await loadNames();
+      } catch(error) {
+        console.error('Error adding name:', error);
+        alert('Sorry, there was an error signing the guest book. Please try again.');
+      }
+    }
+    
+    async function loadNames() {
+      try {
+        const result = await window.storage.get('guestbook', true);
+        const names = result ? JSON.parse(result.value) : [];
+        
+        const container = document.getElementById('names');
+        const countEl = document.getElementById('count');
+        
+        if (names.length === 0) {
+          container.innerHTML = '<div class="empty-state">No signatures yet. Be the first!</div>';
+          countEl.textContent = '';
+          return;
+        }
+        
+        countEl.textContent = `${names.length} signature${names.length === 1 ? '' : 's'}`;
+        
+        // Show newest first
+        container.innerHTML = names
+          .reverse()
+          .map(n => `
+            <div class="name">
+              <span class="name-text">${escapeHtml(n.name)}</span>
+              <span class="name-time">${n.time}</span>
+            </div>
+          `)
+          .join('');
+      } catch(e) {
+        document.getElementById('names').innerHTML = '<div class="empty-state">No signatures yet. Be the first!</div>';
+        document.getElementById('count').textContent = '';
+      }
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Allow Enter key to submit
+    document.getElementById('nameInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        addName();
+      }
+    });
+    
+    // Load names when page opens
+    loadNames();
+  </script>
+</body>
+</html>
