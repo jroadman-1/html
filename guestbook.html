@@ -127,6 +127,16 @@
       font-weight: 600;
     }
     
+    .copy-btn {
+      background: #28a745;
+      margin-top: 20px;
+      width: 100%;
+    }
+    
+    .copy-btn:hover {
+      background: #218838;
+    }
+    
     .error {
       background: #fee;
       color: #c33;
@@ -178,6 +188,9 @@
     
     <div class="count" id="count"></div>
     <div id="names" class="loading">Loading entries...</div>
+    <button class="copy-btn" onclick="copyListToClipboard()" id="copyBtn" style="display: none;">
+      📋 Copy All Names to Clipboard
+    </button>
   </div>
 
   <!-- Firebase SDK -->
@@ -215,10 +228,13 @@
     function displayEntries(data) {
       const container = document.getElementById('names');
       const countEl = document.getElementById('count');
+      const copyBtn = document.getElementById('copyBtn');
       
       if (!data) {
         container.innerHTML = '<div class="empty-state">No entries yet. Be the first!</div>';
         countEl.textContent = '';
+        copyBtn.style.display = 'none';
+        window.currentEntries = [];
         return;
       }
 
@@ -227,7 +243,11 @@
         .map(([id, entry]) => ({ id, ...entry }))
         .sort((a, b) => b.timestamp - a.timestamp);
 
+      // Store entries globally for copying
+      window.currentEntries = entries;
+
       countEl.textContent = `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`;
+      copyBtn.style.display = 'block';
       
       container.innerHTML = entries
         .map(entry => `
@@ -303,6 +323,40 @@
     function hideMessages() {
       document.getElementById('error').style.display = 'none';
       document.getElementById('success').style.display = 'none';
+    }
+    
+    async function copyListToClipboard() {
+      const btn = document.getElementById('copyBtn');
+      const originalText = btn.textContent;
+      
+      try {
+        if (!window.currentEntries || window.currentEntries.length === 0) {
+          showError('No entries to copy');
+          return;
+        }
+        
+        // Create a simple list of names
+        const namesList = window.currentEntries
+          .map(entry => entry.name)
+          .join('\n');
+        
+        // Copy to clipboard
+        await navigator.clipboard.writeText(namesList);
+        
+        // Show success feedback
+        btn.textContent = '✅ Copied!';
+        btn.style.background = '#28a745';
+        
+        // Reset button after 2 seconds
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = '#28a745';
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Error copying to clipboard:', error);
+        showError('Failed to copy. Please try again.');
+      }
     }
     
     // Allow Enter key to submit
