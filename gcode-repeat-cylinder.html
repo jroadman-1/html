@@ -731,7 +731,15 @@
             
             let output = [];
             
-            // Add header ONCE (includes initial positioning, spindle start, etc.)
+            // Identify A-axis positioning lines in the header (these need special handling)
+            const headerALines = [];
+            for (let i = 0; i < parsedData.header.length; i++) {
+                if (/G0?\s+A[-+]?\d+\.?\d*/.test(parsedData.header[i])) {
+                    headerALines.push(i);
+                }
+            }
+            
+            // Add header ONCE for first repetition (includes initial positioning, spindle start, etc.)
             output.push(...parsedData.header);
             
             // Track where we end after each machining pass
@@ -741,7 +749,6 @@
             for (let rep = 0; rep < reps; rep++) {
                 const offset = rep * spacing;
                 
-                // Add a comment for clarity
                 if (rep > 0) {
                     output.push('');  // Blank line for readability
                     output.push(`(REPETITION ${rep + 1} - A OFFSET: +${offset.toFixed(3)})`);
@@ -766,8 +773,18 @@
                     if (aMatch) {
                         const originalA = parseFloat(aMatch[1]);
                         const newA = originalA + offset;
-                        const newLine = line.replace(/A[-+]?\d+\.?\d*/, `A${newA.toFixed(3)}`);
-                        output.push(newLine);
+                        
+                        // For rep 0, include all lines as-is
+                        // For rep 1+, skip the very first A-axis line if it's a positioning move (G0 A...)
+                        // because we've already added our optimized move
+                        const isFirstALine = (originalA === parsedData.minA);
+                        const isPositioningMove = /G0\s+A/.test(line);
+                        
+                        if (rep === 0 || !(isFirstALine && isPositioningMove)) {
+                            const newLine = line.replace(/A[-+]?\d+\.?\d*/, `A${newA.toFixed(3)}`);
+                            output.push(newLine);
+                        }
+                        
                         lastSectionEndA = newA; // Track where this pass ends
                     } else {
                         output.push(line);
@@ -776,19 +793,7 @@
             }
             
             // Add footer ONCE at the end (includes coolant off, spindle off, return home, etc.)
-            // Remove any A-axis reset from footer except the very last instance
-            let modifiedFooter = [];
-            for (let i = 0; i < parsedData.footer.length; i++) {
-                const line = parsedData.footer[i];
-                // Keep the line unless it's an A-axis positioning move and not the last one
-                const isAMove = /G0?\s+A[-+]?\d+\.?\d*/.test(line);
-                if (isAMove && i < parsedData.footer.length - 3) {
-                    // Skip intermediate A-axis moves in footer, but keep the final one
-                    continue;
-                }
-                modifiedFooter.push(line);
-            }
-            output.push(...modifiedFooter);
+            output.push(...parsedData.footer);
             
             generatedGCode = output.join('\n');
             
