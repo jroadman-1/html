@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Helical Pattern Duplicator2</title>
+    <title>Helical Pattern Duplicator</title>
     <style>
         * {
             margin: 0;
@@ -376,7 +376,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Helical Pattern Duplicator2</h1>
+        <h1>Helical Pattern Duplicator3</h1>
         <p class="subtitle">Upload a G-code file with a helical toolpath and duplicate it around a cylinder</p>
         
         <div class="section">
@@ -584,7 +584,7 @@
         function parseGCode(content) {
             const lines = content.split('\n').map(line => line.trim());
             
-            // Find the machining section (lines with A-axis moves)
+            // Find the machining section (lines with A-axis moves during cutting)
             let firstALine = -1;
             let lastALine = -1;
             let aValues = [];
@@ -595,7 +595,7 @@
                 const aMatch = line.match(/A([-+]?\d+\.?\d*)/);
                 if (aMatch) {
                     const aValue = parseFloat(aMatch[1]);
-                    aValues.push({ line: i, value: aValue });
+                    aValues.push({ line: i, value: aValue, lineText: line });
                     if (firstALine === -1) firstALine = i;
                     lastALine = i;
                 }
@@ -606,10 +606,10 @@
                 return;
             }
             
-            // Determine header and footer
-            // Header: everything before first A-axis line
-            // Machining: first A-axis line to last A-axis line
-            // Footer: everything after last A-axis line
+            // Determine sections:
+            // Header: everything before FIRST A-axis move
+            // Machining: FIRST A-axis move through LAST A-axis move  
+            // Footer: everything after LAST A-axis move
             
             const header = lines.slice(0, firstALine);
             const machining = lines.slice(firstALine, lastALine + 1);
@@ -617,6 +617,9 @@
             
             const minA = Math.min(...aValues.map(a => a.value));
             const maxA = Math.max(...aValues.map(a => a.value));
+            
+            // Find any A-axis reset commands in footer
+            const footerHasAReset = footer.some(line => /G0?\s+A[-+]?\d+\.?\d*/.test(line));
             
             parsedData = {
                 lines: lines,
@@ -626,7 +629,8 @@
                 aValues: aValues,
                 minA: minA,
                 maxA: maxA,
-                aRange: maxA - minA
+                aRange: maxA - minA,
+                footerHasAReset: footerHasAReset
             };
             
             document.getElementById('originalRange').textContent = 
@@ -710,12 +714,11 @@
             const optimize = document.getElementById('optimizeToggle').checked;
             
             let output = [];
-            let currentA = 0; // Track current A position
             
-            // Add header
+            // Add header ONCE (includes initial positioning, spindle start, etc.)
             output.push(...parsedData.header);
             
-            // Track last A value from previous section
+            // Track where we end after each machining pass
             let lastSectionEndA = null;
             
             // Generate machining sections for each repetition
@@ -724,20 +727,21 @@
                 
                 // Add a comment for clarity
                 if (rep > 0) {
+                    output.push('');  // Blank line for readability
                     output.push(`(REPETITION ${rep + 1} - A OFFSET: +${offset.toFixed(3)})`);
-                }
-                
-                // If optimizing and not first rep, add optimized A-axis move
-                if (optimize && rep > 0 && lastSectionEndA !== null) {
-                    // Calculate target start position for this repetition
+                    
+                    // Add optimized or non-optimized A-axis positioning
                     const targetStartA = parsedData.minA + offset;
                     
-                    // Find shortest path from current position to target (considering continuous rotation)
-                    const move = shortestRotation(lastSectionEndA, targetStartA);
-                    
-                    const savedRotation = Math.abs(targetStartA - lastSectionEndA);
-                    output.push(`G0 A${move.angle.toFixed(3)} (Optimized move: ${Math.abs(move.distance).toFixed(1)}° vs ${savedRotation.toFixed(1)}°)`);
-                    currentA = move.angle;
+                    if (optimize && lastSectionEndA !== null) {
+                        // Find shortest continuous rotation path
+                        const move = shortestRotation(lastSectionEndA, targetStartA);
+                        const nonOptDistance = Math.abs(targetStartA - lastSectionEndA);
+                        output.push(`G0 A${move.angle.toFixed(3)} (Optimized: ${Math.abs(move.distance).toFixed(1)}° vs ${nonOptDistance.toFixed(1)}°)`);
+                    } else if (!optimize && lastSectionEndA !== null) {
+                        // Non-optimized: just go directly to target
+                        output.push(`G0 A${targetStartA.toFixed(3)}`);
+                    }
                 }
                 
                 // Copy machining section with offset A values
@@ -748,15 +752,27 @@
                         const newA = originalA + offset;
                         const newLine = line.replace(/A[-+]?\d+\.?\d*/, `A${newA.toFixed(3)}`);
                         output.push(newLine);
-                        lastSectionEndA = newA; // Track ending position of this repetition
+                        lastSectionEndA = newA; // Track where this pass ends
                     } else {
                         output.push(line);
                     }
                 }
             }
             
-            // Add footer
-            output.push(...parsedData.footer);
+            // Add footer ONCE at the end (includes coolant off, spindle off, return home, etc.)
+            // Remove any A-axis reset from footer except the very last instance
+            let modifiedFooter = [];
+            for (let i = 0; i < parsedData.footer.length; i++) {
+                const line = parsedData.footer[i];
+                // Keep the line unless it's an A-axis positioning move and not the last one
+                const isAMove = /G0?\s+A[-+]?\d+\.?\d*/.test(line);
+                if (isAMove && i < parsedData.footer.length - 3) {
+                    // Skip intermediate A-axis moves in footer, but keep the final one
+                    continue;
+                }
+                modifiedFooter.push(line);
+            }
+            output.push(...modifiedFooter);
             
             generatedGCode = output.join('\n');
             
