@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Helical Pattern Duplicator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            background: #fafafa;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-area:hover {
+            border-color: #007bff;
+            background: #f0f8ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .file-info {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #2e7d32;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        label {
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        input[type="number"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100%;
+        }
+        
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .readonly-field {
+            padding: 10px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .canvas-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .canvas-wrapper {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+            background: white;
+        }
+        
+        .canvas-title {
+            padding: 10px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            font-weight: 500;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            background: white;
+        }
+        
+        .button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .button-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .button-primary:hover {
+            background: #0056b3;
+        }
+        
+        .button-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .button-secondary {
+            background: #28a745;
+            color: white;
+        }
+        
+        .button-secondary:hover {
+            background: #218838;
+        }
+        
+        .button-secondary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .error {
+            padding: 15px;
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            border-radius: 4px;
+            color: #c62828;
+            margin-top: 15px;
+        }
+        
+        .warning {
+            padding: 15px;
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            border-radius: 4px;
+            color: #e65100;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Helical Pattern Duplicator</h1>
+        <p class="subtitle">Upload a G-code file with a helical toolpath and duplicate it around a cylinder</p>
+        
+        <div class="section">
+            <div class="section-title">1. Upload G-code File</div>
+            <div class="upload-area" id="uploadArea">
+                <div style="font-size: 48px; margin-bottom: 10px;">📁</div>
+                <div style="font-size: 16px; margin-bottom: 5px;">Click to upload or drag and drop</div>
+                <div style="font-size: 12px; color: #999;">G-code files (.nc, .gcode, .txt)</div>
+                <input type="file" id="fileInput" accept=".nc,.gcode,.txt">
+            </div>
+            <div id="fileInfo"></div>
+        </div>
+        
+        <div class="section" id="controlsSection" style="display: none;">
+            <div class="section-title">2. Configure Duplication</div>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="repetitions">Number of Repetitions:</label>
+                    <input type="number" id="repetitions" min="1" max="100" value="6">
+                </div>
+                <div class="control-group">
+                    <label>Spacing (degrees):</label>
+                    <div class="readonly-field" id="spacing">60.000°</div>
+                </div>
+                <div class="control-group">
+                    <label>Total Rotation:</label>
+                    <div class="readonly-field" id="totalRotation">0.000°</div>
+                </div>
+                <div class="control-group">
+                    <label>Original A-axis Range:</label>
+                    <div class="readonly-field" id="originalRange">-</div>
+                </div>
+            </div>
+            
+            <div id="infoPanel" class="info-grid" style="display: none;">
+                <div class="info-item">
+                    <div class="info-label">Machining Lines</div>
+                    <div class="info-value" id="machiningLines">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">A-axis Moves</div>
+                    <div class="info-value" id="axisMoves">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Output Lines</div>
+                    <div class="info-value" id="outputLines">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">File Size</div>
+                    <div class="info-value" id="fileSize">-</div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="button button-primary" id="generateBtn">Generate G-code</button>
+                <button class="button button-secondary" id="downloadBtn" disabled>Download G-code</button>
+            </div>
+            
+            <div id="errorMessage"></div>
+        </div>
+        
+        <div class="section" id="previewSection" style="display: none;">
+            <div class="section-title">3. Visual Preview</div>
+            <div class="canvas-container">
+                <div class="canvas-wrapper">
+                    <div class="canvas-title">Side View (X-Z)</div>
+                    <canvas id="sideCanvas" width="600" height="400"></canvas>
+                </div>
+                <div class="canvas-wrapper">
+                    <div class="canvas-title">Top View (Cylinder Unwrapped)</div>
+                    <canvas id="topCanvas" width="600" height="400"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let uploadedFile = null;
+        let parsedData = null;
+        let generatedGCode = null;
+        
+        // Prevent wheel events on number inputs
+        document.addEventListener('wheel', function(e) {
+            if (document.activeElement.type === 'number') {
+                document.activeElement.blur();
+            }
+        });
+        
+        // Upload area handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function handleFile(file) {
+            uploadedFile = file;
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                const content = e.target.result;
+                parseGCode(content);
+                showFileInfo(file);
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        function showFileInfo(file) {
+            const fileInfo = document.getElementById('fileInfo');
+            fileInfo.innerHTML = `
+                <div class="file-info">
+                    <strong>File loaded:</strong> ${file.name} (${(file.size / 1024).toFixed(2)} KB)
+                </div>
+            `;
+            document.getElementById('controlsSection').style.display = 'block';
+        }
+        
+        function parseGCode(content) {
+            const lines = content.split('\n').map(line => line.trim());
+            
+            // Find the machining section (lines with A-axis moves)
+            let firstALine = -1;
+            let lastALine = -1;
+            let aValues = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                // Look for A-axis moves (A followed by number)
+                const aMatch = line.match(/A([-+]?\d+\.?\d*)/);
+                if (aMatch) {
+                    const aValue = parseFloat(aMatch[1]);
+                    aValues.push({ line: i, value: aValue });
+                    if (firstALine === -1) firstALine = i;
+                    lastALine = i;
+                }
+            }
+            
+            if (aValues.length === 0) {
+                showError('No A-axis moves found in the file. This tool requires a helical toolpath with A-axis movement.');
+                return;
+            }
+            
+            // Determine header and footer
+            // Header: everything before first A-axis line
+            // Machining: first A-axis line to last A-axis line
+            // Footer: everything after last A-axis line
+            
+            const header = lines.slice(0, firstALine);
+            const machining = lines.slice(firstALine, lastALine + 1);
+            const footer = lines.slice(lastALine + 1);
+            
+            const minA = Math.min(...aValues.map(a => a.value));
+            const maxA = Math.max(...aValues.map(a => a.value));
+            
+            parsedData = {
+                lines: lines,
+                header: header,
+                machining: machining,
+                footer: footer,
+                aValues: aValues,
+                minA: minA,
+                maxA: maxA,
+                aRange: maxA - minA
+            };
+            
+            document.getElementById('originalRange').textContent = 
+                `${minA.toFixed(3)}° to ${maxA.toFixed(3)}° (${parsedData.aRange.toFixed(3)}°)`;
+            
+            document.getElementById('machiningLines').textContent = machining.length;
+            document.getElementById('axisMoves').textContent = aValues.length;
+            document.getElementById('infoPanel').style.display = 'grid';
+            
+            updateCalculations();
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = `<div class="error">${message}</div>`;
+        }
+        
+        function clearError() {
+            document.getElementById('errorMessage').innerHTML = '';
+        }
+        
+        document.getElementById('repetitions').addEventListener('input', updateCalculations);
+        
+        function updateCalculations() {
+            if (!parsedData) return;
+            
+            const reps = parseInt(document.getElementById('repetitions').value) || 1;
+            const spacing = 360 / reps;
+            
+            document.getElementById('spacing').textContent = spacing.toFixed(3) + '°';
+            
+            const totalRotation = parsedData.aRange * reps;
+            document.getElementById('totalRotation').textContent = totalRotation.toFixed(3) + '°';
+            
+            clearError();
+        }
+        
+        document.getElementById('generateBtn').addEventListener('click', generateGCode);
+        
+        function generateGCode() {
+            if (!parsedData) return;
+            
+            clearError();
+            
+            const reps = parseInt(document.getElementById('repetitions').value) || 1;
+            const spacing = 360 / reps;
+            
+            let output = [];
+            
+            // Add header
+            output.push(...parsedData.header);
+            
+            // Generate machining sections for each repetition
+            for (let rep = 0; rep < reps; rep++) {
+                const offset = rep * spacing;
+                
+                // Add a comment for clarity
+                if (rep > 0) {
+                    output.push(`(REPETITION ${rep + 1} - A OFFSET: +${offset.toFixed(3)})`);
+                }
+                
+                // Copy machining section with offset A values
+                for (let line of parsedData.machining) {
+                    const aMatch = line.match(/A([-+]?\d+\.?\d*)/);
+                    if (aMatch) {
+                        const originalA = parseFloat(aMatch[1]);
+                        const newA = originalA + offset;
+                        const newLine = line.replace(/A[-+]?\d+\.?\d*/, `A${newA.toFixed(3)}`);
+                        output.push(newLine);
+                    } else {
+                        output.push(line);
+                    }
+                }
+            }
+            
+            // Add footer
+            output.push(...parsedData.footer);
+            
+            generatedGCode = output.join('\n');
+            
+            // Update info
+            document.getElementById('outputLines').textContent = output.length;
+            const sizeKB = (new Blob([generatedGCode]).size / 1024).toFixed(2);
+            document.getElementById('fileSize').textContent = sizeKB + ' KB';
+            
+            document.getElementById('downloadBtn').disabled = false;
+            
+            // Draw preview
+            drawPreview(reps, spacing);
+            document.getElementById('previewSection').style.display = 'block';
+        }
+        
+        document.getElementById('downloadBtn').addEventListener('click', downloadGCode);
+        
+        function downloadGCode() {
+            if (!generatedGCode || !uploadedFile) return;
+            
+            const originalName = uploadedFile.name.replace(/\.[^/.]+$/, '');
+            const reps = parseInt(document.getElementById('repetitions').value) || 1;
+            const filename = `${originalName}_${reps}x.nc`;
+            
+            const blob = new Blob([generatedGCode], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function drawPreview(reps, spacing) {
+            drawSideView(reps, spacing);
+            drawTopView(reps, spacing);
+        }
+        
+        function drawSideView(reps, spacing) {
+            const canvas = document.getElementById('sideCanvas');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            // Extract X and Z coordinates from machining section
+            let points = [];
+            for (let line of parsedData.machining) {
+                const xMatch = line.match(/X([-+]?\d+\.?\d*)/);
+                const zMatch = line.match(/Z([-+]?\d+\.?\d*)/);
+                
+                if (xMatch || zMatch) {
+                    if (points.length === 0) {
+                        points.push({ x: xMatch ? parseFloat(xMatch[1]) : 0, z: zMatch ? parseFloat(zMatch[1]) : 0 });
+                    } else {
+                        const lastPoint = points[points.length - 1];
+                        points.push({
+                            x: xMatch ? parseFloat(xMatch[1]) : lastPoint.x,
+                            z: zMatch ? parseFloat(zMatch[1]) : lastPoint.z
+                        });
+                    }
+                }
+            }
+            
+            if (points.length === 0) return;
+            
+            // Find bounds
+            const xValues = points.map(p => p.x);
+            const zValues = points.map(p => p.z);
+            const minX = Math.min(...xValues);
+            const maxX = Math.max(...xValues);
+            const minZ = Math.min(...zValues);
+            const maxZ = Math.max(...zValues);
+            
+            const margin = 40;
+            const plotWidth = width - 2 * margin;
+            const plotHeight = height - 2 * margin;
+            
+            const xRange = maxX - minX || 1;
+            const zRange = maxZ - minZ || 1;
+            
+            // Calculate scale to fit
+            const scale = Math.min(plotWidth / xRange, plotHeight / zRange) * 0.9;
+            
+            function toScreenX(x) {
+                return margin + (x - minX) * scale + (plotWidth - xRange * scale) / 2;
+            }
+            
+            function toScreenY(z) {
+                return height - margin - (z - minZ) * scale - (plotHeight - zRange * scale) / 2;
+            }
+            
+            // Draw grid
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const x = margin + (plotWidth / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(x, margin);
+                ctx.lineTo(x, height - margin);
+                ctx.stroke();
+                
+                const y = margin + (plotHeight / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(margin, y);
+                ctx.lineTo(width - margin, y);
+                ctx.stroke();
+            }
+            
+            // Draw all repetitions in different colors
+            const colors = ['#2196F3', '#4CAF50', '#FF9800', '#9C27B0', '#F44336', '#00BCD4'];
+            
+            for (let rep = 0; rep < reps; rep++) {
+                ctx.strokeStyle = colors[rep % colors.length];
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.7;
+                
+                ctx.beginPath();
+                ctx.moveTo(toScreenX(points[0].x), toScreenY(points[0].z));
+                
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(toScreenX(points[i].x), toScreenY(points[i].z));
+                }
+                
+                ctx.stroke();
+            }
+            
+            ctx.globalAlpha = 1;
+            
+            // Draw axes labels
+            ctx.fillStyle = '#666';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('X', width / 2, height - 10);
+            ctx.save();
+            ctx.translate(15, height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('Z', 0, 0);
+            ctx.restore();
+            
+            // Draw dimensions
+            ctx.fillStyle = '#333';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(`X: ${minX.toFixed(3)}" to ${maxX.toFixed(3)}"`, width - margin, margin - 5);
+            ctx.fillText(`Z: ${minZ.toFixed(3)}" to ${maxZ.toFixed(3)}"`, width - margin, margin - 20);
+        }
+        
+        function drawTopView(reps, spacing) {
+            const canvas = document.getElementById('topCanvas');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            // Extract A and X coordinates (unwrapped cylinder view)
+            let points = [];
+            for (let line of parsedData.machining) {
+                const aMatch = line.match(/A([-+]?\d+\.?\d*)/);
+                const xMatch = line.match(/X([-+]?\d+\.?\d*)/);
+                
+                if (aMatch || xMatch) {
+                    if (points.length === 0) {
+                        points.push({ a: aMatch ? parseFloat(aMatch[1]) : 0, x: xMatch ? parseFloat(xMatch[1]) : 0 });
+                    } else {
+                        const lastPoint = points[points.length - 1];
+                        points.push({
+                            a: aMatch ? parseFloat(aMatch[1]) : lastPoint.a,
+                            x: xMatch ? parseFloat(xMatch[1]) : lastPoint.x
+                        });
+                    }
+                }
+            }
+            
+            if (points.length === 0) return;
+            
+            const margin = 40;
+            const plotWidth = width - 2 * margin;
+            const plotHeight = height - 2 * margin;
+            
+            // Calculate bounds for all repetitions
+            const minA = parsedData.minA;
+            const maxA = parsedData.maxA + (reps - 1) * spacing;
+            const aRange = maxA - minA;
+            
+            const xValues = points.map(p => p.x);
+            const minX = Math.min(...xValues);
+            const maxX = Math.max(...xValues);
+            const xRange = maxX - minX || 1;
+            
+            const scaleA = plotWidth / aRange;
+            const scaleX = plotHeight / xRange * 0.9;
+            
+            function toScreenA(a) {
+                return margin + (a - minA) * scaleA;
+            }
+            
+            function toScreenX(x) {
+                return margin + (x - minX) * scaleX + (plotHeight - xRange * scaleX) / 2;
+            }
+            
+            // Draw grid
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            
+            // Vertical lines at each repetition start
+            for (let rep = 0; rep <= reps; rep++) {
+                const a = parsedData.minA + rep * spacing;
+                const x = toScreenA(a);
+                ctx.beginPath();
+                ctx.moveTo(x, margin);
+                ctx.lineTo(x, height - margin);
+                ctx.stroke();
+                
+                // Label
+                ctx.fillStyle = '#999';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${a.toFixed(0)}°`, x, height - margin + 15);
+            }
+            
+            // Horizontal lines
+            for (let i = 0; i <= 5; i++) {
+                const y = margin + (plotHeight / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(margin, y);
+                ctx.lineTo(width - margin, y);
+                ctx.stroke();
+            }
+            
+            // Draw all repetitions
+            const colors = ['#2196F3', '#4CAF50', '#FF9800', '#9C27B0', '#F44336', '#00BCD4'];
+            
+            for (let rep = 0; rep < reps; rep++) {
+                const offset = rep * spacing;
+                
+                ctx.strokeStyle = colors[rep % colors.length];
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.7;
+                
+                ctx.beginPath();
+                ctx.moveTo(toScreenA(points[0].a + offset), toScreenX(points[0].x));
+                
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(toScreenA(points[i].a + offset), toScreenX(points[i].x));
+                }
+                
+                ctx.stroke();
+            }
+            
+            ctx.globalAlpha = 1;
+            
+            // Draw axes labels
+            ctx.fillStyle = '#666';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('A-axis (Rotation)', width / 2, height - 10);
+            ctx.save();
+            ctx.translate(15, height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('X (Radius)', 0, 0);
+            ctx.restore();
+        }
+    </script>
+</body>
+</html>
