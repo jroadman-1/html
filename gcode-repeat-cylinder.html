@@ -677,21 +677,27 @@
         }
         
         function shortestRotation(from, to) {
-            // Calculate shortest rotation from 'from' angle to 'to' angle
-            from = normalizeAngle(from);
-            to = normalizeAngle(to);
+            // Find the nearest equivalent angle to 'to' considering continuous rotation
+            // We can go to 'to', 'to+360', or 'to-360' - whichever is closest to 'from'
             
-            let forward = to - from;
-            if (forward < 0) forward += 360;
+            const options = [
+                { angle: to - 360, distance: Math.abs((to - 360) - from) },
+                { angle: to, distance: Math.abs(to - from) },
+                { angle: to + 360, distance: Math.abs((to + 360) - from) }
+            ];
             
-            let backward = from - to;
-            if (backward < 0) backward += 360;
-            
-            if (forward <= backward) {
-                return { angle: to, distance: forward };
-            } else {
-                return { angle: to, distance: -backward };
+            // Find the option with minimum distance
+            let best = options[0];
+            for (let opt of options) {
+                if (opt.distance < best.distance) {
+                    best = opt;
+                }
             }
+            
+            // Calculate actual rotation direction and distance
+            const actualDistance = best.angle - from;
+            
+            return { angle: best.angle, distance: actualDistance };
         }
         
         function generateGCode() {
@@ -726,10 +732,11 @@
                     // Calculate target start position for this repetition
                     const targetStartA = parsedData.minA + offset;
                     
-                    // Find shortest path from current position to target
+                    // Find shortest path from current position to target (considering continuous rotation)
                     const move = shortestRotation(lastSectionEndA, targetStartA);
                     
-                    output.push(`G0 A${move.angle.toFixed(3)} (Optimized move: ${Math.abs(move.distance).toFixed(1)}° vs ${Math.abs(targetStartA - lastSectionEndA).toFixed(1)}°)`);
+                    const savedRotation = Math.abs(targetStartA - lastSectionEndA);
+                    output.push(`G0 A${move.angle.toFixed(3)} (Optimized move: ${Math.abs(move.distance).toFixed(1)}° vs ${savedRotation.toFixed(1)}°)`);
                     currentA = move.angle;
                 }
                 
@@ -741,7 +748,7 @@
                         const newA = originalA + offset;
                         const newLine = line.replace(/A[-+]?\d+\.?\d*/, `A${newA.toFixed(3)}`);
                         output.push(newLine);
-                        lastSectionEndA = newA; // Track ending position
+                        lastSectionEndA = newA; // Track ending position of this repetition
                     } else {
                         output.push(line);
                     }
@@ -855,7 +862,7 @@
                 }
             }
             
-            // Optimized: shortest path between sections
+            // Optimized: shortest path between sections using continuous rotation
             aMotionOptimized = aRangePerPass * reps; // The cutting motion stays the same
             
             if (optimize) {
