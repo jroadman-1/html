@@ -376,7 +376,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Helical Pattern Duplicator3</h1>
+        <h1>Helical Pattern Duplicator</h1>
         <p class="subtitle">Upload a G-code file with a helical toolpath and duplicate it around a cylinder</p>
         
         <div class="section">
@@ -584,60 +584,76 @@
         function parseGCode(content) {
             const lines = content.split('\n').map(line => line.trim());
             
-            // Find the machining section (lines with A-axis moves during cutting)
-            let firstALine = -1;
-            let lastALine = -1;
-            let aValues = [];
+            // Find all A-axis moves
+            let aLines = [];
             
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
-                // Look for A-axis moves (A followed by number)
                 const aMatch = line.match(/A([-+]?\d+\.?\d*)/);
                 if (aMatch) {
                     const aValue = parseFloat(aMatch[1]);
-                    aValues.push({ line: i, value: aValue, lineText: line });
-                    if (firstALine === -1) firstALine = i;
-                    lastALine = i;
+                    aLines.push({ lineIndex: i, value: aValue, line: line });
                 }
             }
             
-            if (aValues.length === 0) {
+            if (aLines.length === 0) {
                 showError('No A-axis moves found in the file. This tool requires a helical toolpath with A-axis movement.');
                 return;
             }
             
-            // Determine sections:
-            // Header: everything before FIRST A-axis move
-            // Machining: FIRST A-axis move through LAST A-axis move  
-            // Footer: everything after LAST A-axis move
+            // Find first and last A-axis move
+            const firstALine = aLines[0].lineIndex;
+            const lastALine = aLines[aLines.length - 1].lineIndex;
+            
+            // Check if the last A-axis move is near program end (likely a home/reset command)
+            // If it's within the last 10 lines and moves to a "home" position (near 0 or 360), it's probably a reset
+            const isLastALineReset = (lines.length - lastALine < 10) && 
+                                      (Math.abs(aLines[aLines.length - 1].value) < 1 || 
+                                       Math.abs(aLines[aLines.length - 1].value - 360) < 1);
+            
+            let machiningEndLine = lastALine;
+            
+            if (isLastALineReset) {
+                // The last A-axis line is a reset command, so machining ends at the second-to-last A line
+                machiningEndLine = aLines[aLines.length - 2].lineIndex;
+            }
+            
+            // Also look for M5 (spindle off) or M9 (coolant off) after cutting but before reset
+            // The machining section should end after the last cutting A-axis move but before M5/M9
+            for (let i = machiningEndLine + 1; i < lines.length; i++) {
+                if (lines[i].includes('M5') || lines[i].includes('M9')) {
+                    // Found end-of-cycle commands, extend machining section to include retracts before them
+                    machiningEndLine = i - 1;
+                    break;
+                }
+            }
             
             const header = lines.slice(0, firstALine);
-            const machining = lines.slice(firstALine, lastALine + 1);
-            const footer = lines.slice(lastALine + 1);
+            const machining = lines.slice(firstALine, machiningEndLine + 1);
+            const footer = lines.slice(machiningEndLine + 1);
             
-            const minA = Math.min(...aValues.map(a => a.value));
-            const maxA = Math.max(...aValues.map(a => a.value));
-            
-            // Find any A-axis reset commands in footer
-            const footerHasAReset = footer.some(line => /G0?\s+A[-+]?\d+\.?\d*/.test(line));
+            // Calculate A-axis range from actual cutting moves (exclude reset moves)
+            const cuttingAValues = aLines.slice(0, isLastALineReset ? -1 : undefined).map(a => a.value);
+            const minA = Math.min(...cuttingAValues);
+            const maxA = Math.max(...cuttingAValues);
             
             parsedData = {
                 lines: lines,
                 header: header,
                 machining: machining,
                 footer: footer,
-                aValues: aValues,
+                aValues: aLines,
                 minA: minA,
                 maxA: maxA,
                 aRange: maxA - minA,
-                footerHasAReset: footerHasAReset
+                isLastALineReset: isLastALineReset
             };
             
             document.getElementById('originalRange').textContent = 
                 `${minA.toFixed(3)}° to ${maxA.toFixed(3)}° (${parsedData.aRange.toFixed(3)}°)`;
             
             document.getElementById('machiningLines').textContent = machining.length;
-            document.getElementById('axisMoves').textContent = aValues.length;
+            document.getElementById('axisMoves').textContent = cuttingAValues.length;
             document.getElementById('infoPanel').style.display = 'grid';
             
             updateCalculations();
