@@ -377,7 +377,7 @@
 <body>
     <div class="container">
         <h1>Helical Pattern Duplicator</h1>
-        <p class="subtitle">Upload a G-code file with a helical toolpath and duplicate it around a cylinder</p>
+        <p class="subtitle">Upload a G-code file with a helical toolpath and duplicate it around a cylinder with optimized A-axis motion</p>
         
         <div class="section">
             <div class="section-title">1. Upload G-code File</div>
@@ -416,7 +416,7 @@
                     <input type="checkbox" id="optimizeToggle" checked>
                     <span class="toggle-slider"></span>
                 </label>
-                <label for="optimizeToggle" style="cursor: pointer; margin: 0;">Optimize A-axis moves between operations</label>
+                <label for="optimizeToggle" style="cursor: pointer; margin: 0;">Optimize A-axis moves between operations (shortest rotation path)</label>
             </div>
             
             <div class="controls" style="margin-top: 20px;">
@@ -432,6 +432,10 @@
             
             <div id="infoPanel" class="info-grid" style="display: none;">
                 <div class="info-item">
+                    <div class="info-label">Setup Lines</div>
+                    <div class="info-value" id="setupLines">-</div>
+                </div>
+                <div class="info-item">
                     <div class="info-label">Machining Lines</div>
                     <div class="info-value" id="machiningLines">-</div>
                 </div>
@@ -442,10 +446,6 @@
                 <div class="info-item">
                     <div class="info-label">Output Lines</div>
                     <div class="info-value" id="outputLines">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">File Size</div>
-                    <div class="info-value" id="fileSize">-</div>
                 </div>
             </div>
             
@@ -584,76 +584,79 @@
         function parseGCode(content) {
             const lines = content.split('\n').map(line => line.trim());
             
-            // Find all A-axis moves
-            let aLines = [];
+            // NEW APPROACH: Find the complete setup section and footer section
+            // Setup ends AFTER the initial A positioning
+            // Footer starts with retracts/M5/M9
+            
+            let firstALineIndex = -1;
+            let lastCuttingALineIndex = -1;
+            let m5LineIndex = -1;
+            
+            let allALines = [];
             
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
+                
+                // Find A-axis moves
                 const aMatch = line.match(/A([-+]?\d+\.?\d*)/);
                 if (aMatch) {
                     const aValue = parseFloat(aMatch[1]);
-                    aLines.push({ lineIndex: i, value: aValue, line: line });
+                    allALines.push({ index: i, value: aValue, line: line });
+                    
+                    if (firstALineIndex === -1) {
+                        firstALineIndex = i;
+                    }
+                    
+                    // Track last cutting A-axis line (not a reset near 0)
+                    if (Math.abs(aValue) > 10 && Math.abs(aValue - 360) > 10) {
+                        lastCuttingALineIndex = i;
+                    }
+                }
+                
+                // Find M5 (spindle off) - marks start of footer
+                if (line.includes('M5') && m5LineIndex === -1) {
+                    m5LineIndex = i;
                 }
             }
             
-            if (aLines.length === 0) {
-                showError('No A-axis moves found in the file. This tool requires a helical toolpath with A-axis movement.');
+            if (allALines.length === 0) {
+                showError('No A-axis moves found in the file.');
                 return;
             }
             
-            // Find first and last A-axis move
-            const firstALine = aLines[0].lineIndex;
-            const lastALine = aLines[aLines.length - 1].lineIndex;
+            // Structure:
+            // Setup: Everything UP TO AND INCLUDING the first A positioning line
+            // Machining: After first A line through the line BEFORE M5
+            // Footer: M5 onwards
             
-            // Check if the last A-axis move is near program end (likely a home/reset command)
-            // If it's within the last 10 lines and moves to a "home" position (near 0 or 360), it's probably a reset
-            const isLastALineReset = (lines.length - lastALine < 10) && 
-                                      (Math.abs(aLines[aLines.length - 1].value) < 1 || 
-                                       Math.abs(aLines[aLines.length - 1].value - 360) < 1);
+            const setup = lines.slice(0, firstALineIndex + 1);  // Include the initial A positioning
+            const machining = lines.slice(firstALineIndex + 1, m5LineIndex);  // Everything between
+            const footer = lines.slice(m5LineIndex);  // From M5 onwards
             
-            let machiningEndLine = lastALine;
-            
-            if (isLastALineReset) {
-                // The last A-axis line is a reset command, so machining ends at the second-to-last A line
-                machiningEndLine = aLines[aLines.length - 2].lineIndex;
-            }
-            
-            // Also look for M5 (spindle off) or M9 (coolant off) after cutting but before reset
-            // The machining section should end after the last cutting A-axis move but before M5/M9
-            for (let i = machiningEndLine + 1; i < lines.length; i++) {
-                if (lines[i].includes('M5') || lines[i].includes('M9')) {
-                    // Found end-of-cycle commands, extend machining section to include retracts before them
-                    machiningEndLine = i - 1;
-                    break;
-                }
-            }
-            
-            const header = lines.slice(0, firstALine);
-            const machining = lines.slice(firstALine, machiningEndLine + 1);
-            const footer = lines.slice(machiningEndLine + 1);
-            
-            // Calculate A-axis range from actual cutting moves (exclude reset moves)
-            const cuttingAValues = aLines.slice(0, isLastALineReset ? -1 : undefined).map(a => a.value);
-            const minA = Math.min(...cuttingAValues);
-            const maxA = Math.max(...cuttingAValues);
+            // Get A-axis range from machining section only
+            const machiningAValues = allALines.filter(a => a.index > firstALineIndex && a.index < m5LineIndex);
+            const minA = Math.min(...machiningAValues.map(a => a.value));
+            const maxA = Math.max(...machiningAValues.map(a => a.value));
             
             parsedData = {
                 lines: lines,
-                header: header,
+                setup: setup,
                 machining: machining,
                 footer: footer,
-                aValues: aLines,
+                allALines: allALines,
+                machiningAValues: machiningAValues,
                 minA: minA,
                 maxA: maxA,
                 aRange: maxA - minA,
-                isLastALineReset: isLastALineReset
+                initialAPosition: allALines[0].value
             };
             
             document.getElementById('originalRange').textContent = 
                 `${minA.toFixed(3)}° to ${maxA.toFixed(3)}° (${parsedData.aRange.toFixed(3)}°)`;
             
+            document.getElementById('setupLines').textContent = setup.length;
             document.getElementById('machiningLines').textContent = machining.length;
-            document.getElementById('axisMoves').textContent = cuttingAValues.length;
+            document.getElementById('axisMoves').textContent = machiningAValues.length;
             document.getElementById('infoPanel').style.display = 'grid';
             
             updateCalculations();
@@ -687,26 +690,14 @@
             clearError();
         }
         
-        document.getElementById('generateBtn').addEventListener('click', generateGCode);
-        
-        function normalizeAngle(angle) {
-            // Normalize angle to 0-360 range
-            while (angle < 0) angle += 360;
-            while (angle >= 360) angle -= 360;
-            return angle;
-        }
-        
         function shortestRotation(from, to) {
-            // Find the nearest equivalent angle to 'to' considering continuous rotation
-            // We can go to 'to', 'to+360', or 'to-360' - whichever is closest to 'from'
-            
+            // Find the nearest equivalent angle considering continuous rotation
             const options = [
                 { angle: to - 360, distance: Math.abs((to - 360) - from) },
                 { angle: to, distance: Math.abs(to - from) },
                 { angle: to + 360, distance: Math.abs((to + 360) - from) }
             ];
             
-            // Find the option with minimum distance
             let best = options[0];
             for (let opt of options) {
                 if (opt.distance < best.distance) {
@@ -714,11 +705,11 @@
                 }
             }
             
-            // Calculate actual rotation direction and distance
             const actualDistance = best.angle - from;
-            
             return { angle: best.angle, distance: actualDistance };
         }
+        
+        document.getElementById('generateBtn').addEventListener('click', generateGCode);
         
         function generateGCode() {
             if (!parsedData) return;
@@ -731,38 +722,27 @@
             
             let output = [];
             
-            // Identify A-axis positioning lines in the header (these need special handling)
-            const headerALines = [];
-            for (let i = 0; i < parsedData.header.length; i++) {
-                if (/G0?\s+A[-+]?\d+\.?\d*/.test(parsedData.header[i])) {
-                    headerALines.push(i);
-                }
-            }
+            // Add setup section ONCE
+            output.push(...parsedData.setup);
             
-            // Add header ONCE for first repetition (includes initial positioning, spindle start, etc.)
-            output.push(...parsedData.header);
+            let lastEndA = parsedData.maxA;
             
-            // Track where we end after each machining pass
-            let lastSectionEndA = null;
-            
-            // Generate machining sections for each repetition
+            // Generate machining passes
             for (let rep = 0; rep < reps; rep++) {
                 const offset = rep * spacing;
                 
                 if (rep > 0) {
-                    output.push('');  // Blank line for readability
+                    output.push('');
                     output.push(`(REPETITION ${rep + 1} - A OFFSET: +${offset.toFixed(3)})`);
                     
-                    // Add optimized or non-optimized A-axis positioning
+                    // Calculate where we need to go
                     const targetStartA = parsedData.minA + offset;
                     
-                    if (optimize && lastSectionEndA !== null) {
-                        // Find shortest continuous rotation path
-                        const move = shortestRotation(lastSectionEndA, targetStartA);
-                        const nonOptDistance = Math.abs(targetStartA - lastSectionEndA);
+                    if (optimize) {
+                        const move = shortestRotation(lastEndA, targetStartA);
+                        const nonOptDistance = Math.abs(targetStartA - lastEndA);
                         output.push(`G0 A${move.angle.toFixed(3)} (Optimized: ${Math.abs(move.distance).toFixed(1)}° vs ${nonOptDistance.toFixed(1)}°)`);
-                    } else if (!optimize && lastSectionEndA !== null) {
-                        // Non-optimized: just go directly to target
+                    } else {
                         output.push(`G0 A${targetStartA.toFixed(3)}`);
                     }
                 }
@@ -773,34 +753,22 @@
                     if (aMatch) {
                         const originalA = parseFloat(aMatch[1]);
                         const newA = originalA + offset;
-                        
-                        // For rep 0, include all lines as-is
-                        // For rep 1+, skip the very first A-axis line if it's a positioning move (G0 A...)
-                        // because we've already added our optimized move
-                        const isFirstALine = (originalA === parsedData.minA);
-                        const isPositioningMove = /G0\s+A/.test(line);
-                        
-                        if (rep === 0 || !(isFirstALine && isPositioningMove)) {
-                            const newLine = line.replace(/A[-+]?\d+\.?\d*/, `A${newA.toFixed(3)}`);
-                            output.push(newLine);
-                        }
-                        
-                        lastSectionEndA = newA; // Track where this pass ends
+                        const newLine = line.replace(/A[-+]?\d+\.?\d*/, `A${newA.toFixed(3)}`);
+                        output.push(newLine);
+                        lastEndA = newA;
                     } else {
                         output.push(line);
                     }
                 }
             }
             
-            // Add footer ONCE at the end (includes coolant off, spindle off, return home, etc.)
+            // Add footer ONCE
             output.push(...parsedData.footer);
             
             generatedGCode = output.join('\n');
             
             // Update info
             document.getElementById('outputLines').textContent = output.length;
-            const sizeKB = (new Blob([generatedGCode]).size / 1024).toFixed(2);
-            document.getElementById('fileSize').textContent = sizeKB + ' KB';
             
             document.getElementById('downloadBtn').disabled = false;
             
@@ -832,13 +800,12 @@
             const rapidRate = parseFloat(document.getElementById('rapidRate').value) || 100;
             const aRapidRate = parseFloat(document.getElementById('aRapidRate').value) || 50;
             
-            // Parse the machining section to calculate times
             let cuttingTime = 0;
             let rapidTime = 0;
             let lastX = 0, lastY = 0, lastZ = 0, lastA = 0;
             let currentFeed = 0;
             
-            // Calculate time for one pass through machining section
+            // Calculate time for one pass
             for (let line of parsedData.machining) {
                 const gMatch = line.match(/G0?\d+/);
                 const xMatch = line.match(/X([-+]?\d+\.?\d*)/);
@@ -857,17 +824,14 @@
                 const dx = x - lastX;
                 const dy = y - lastY;
                 const dz = z - lastZ;
-                const da = a - lastA;
                 
                 const linearDist = Math.sqrt(dx*dx + dy*dy + dz*dz);
                 
                 if (gMatch && gMatch[0] === 'G0') {
-                    // Rapid move
                     if (linearDist > 0) {
                         rapidTime += linearDist / rapidRate;
                     }
                 } else if (gMatch && (gMatch[0] === 'G1' || gMatch[0] === 'G01')) {
-                    // Cutting move
                     if (currentFeed > 0 && linearDist > 0) {
                         cuttingTime += linearDist / currentFeed;
                     }
@@ -879,69 +843,56 @@
                 lastA = a;
             }
             
-            // Multiply by number of repetitions
             const totalCuttingTime = cuttingTime * reps;
             const totalRapidTime = rapidTime * reps;
             
-            // Calculate A-axis motion time
-            let aMotionOptimized = 0;
-            let aMotionNonOptimized = 0;
+            // Calculate A-axis times
+            let aMotionNonOpt = 0;
+            let aMotionOpt = 0;
             
-            // Non-optimized: sequential A-axis motion
-            const aRangePerPass = parsedData.maxA - parsedData.minA;
-            for (let rep = 0; rep < reps; rep++) {
-                aMotionNonOptimized += aRangePerPass; // The cutting motion
-                if (rep < reps - 1) {
-                    // Rewind back to start position for next pass
-                    const currentEnd = parsedData.maxA + rep * spacing;
-                    const nextStart = parsedData.minA + (rep + 1) * spacing;
-                    aMotionNonOptimized += Math.abs(nextStart - currentEnd);
-                }
+            const aRangePerPass = parsedData.aRange;
+            
+            // Non-optimized
+            aMotionNonOpt = aRangePerPass * reps;
+            for (let rep = 1; rep < reps; rep++) {
+                const currentEnd = parsedData.maxA + (rep - 1) * spacing;
+                const nextStart = parsedData.minA + rep * spacing;
+                aMotionNonOpt += Math.abs(nextStart - currentEnd);
             }
             
-            // Optimized: shortest path between sections using continuous rotation
-            aMotionOptimized = aRangePerPass * reps; // The cutting motion stays the same
-            
-            if (optimize) {
-                let lastEndA = parsedData.maxA;
-                for (let rep = 1; rep < reps; rep++) {
-                    const nextStartA = parsedData.minA + rep * spacing;
-                    const move = shortestRotation(lastEndA, nextStartA);
-                    aMotionOptimized += Math.abs(move.distance);
-                    lastEndA = parsedData.maxA + rep * spacing;
-                }
-            } else {
-                aMotionOptimized = aMotionNonOptimized;
+            // Optimized
+            aMotionOpt = aRangePerPass * reps;
+            let lastEnd = parsedData.maxA;
+            for (let rep = 1; rep < reps; rep++) {
+                const nextStart = parsedData.minA + rep * spacing;
+                const move = shortestRotation(lastEnd, nextStart);
+                aMotionOpt += Math.abs(move.distance);
+                lastEnd = parsedData.maxA + rep * spacing;
             }
             
-            const aTimeNonOpt = aMotionNonOptimized / aRapidRate;
-            const aTimeOpt = aMotionOptimized / aRapidRate;
+            const aTimeNonOpt = aMotionNonOpt / aRapidRate;
+            const aTimeOpt = aMotionOpt / aRapidRate;
             
-            // Calculate totals
             const totalNonOpt = totalCuttingTime + totalRapidTime + aTimeNonOpt;
             const totalOpt = totalCuttingTime + totalRapidTime + aTimeOpt;
             const timeSaved = totalNonOpt - totalOpt;
             
-            // Format time as minutes:seconds
             function formatTime(minutes) {
                 const mins = Math.floor(minutes);
                 const secs = Math.round((minutes - mins) * 60);
                 return `${mins}:${secs.toString().padStart(2, '0')}`;
             }
             
-            // Update display - Non-optimized
             document.getElementById('timeNonOptCut').textContent = formatTime(totalCuttingTime);
             document.getElementById('timeNonOptRapid').textContent = formatTime(totalRapidTime);
-            document.getElementById('timeNonOptA').textContent = formatTime(aTimeNonOpt) + ` (${aMotionNonOptimized.toFixed(0)}°)`;
+            document.getElementById('timeNonOptA').textContent = formatTime(aTimeNonOpt) + ` (${aMotionNonOpt.toFixed(0)}°)`;
             document.getElementById('timeNonOptTotal').textContent = formatTime(totalNonOpt);
             
-            // Update display - Optimized
             document.getElementById('timeOptCut').textContent = formatTime(totalCuttingTime);
             document.getElementById('timeOptRapid').textContent = formatTime(totalRapidTime);
-            document.getElementById('timeOptA').textContent = formatTime(aTimeOpt) + ` (${aMotionOptimized.toFixed(0)}°)`;
+            document.getElementById('timeOptA').textContent = formatTime(aTimeOpt) + ` (${aMotionOpt.toFixed(0)}°)`;
             document.getElementById('timeOptTotal').textContent = formatTime(totalOpt);
             
-            // Show savings
             if (timeSaved > 0.01) {
                 document.getElementById('timeSavings').style.display = 'block';
                 document.getElementById('timeSavingsValue').textContent = formatTime(timeSaved);
@@ -958,7 +909,6 @@
             
             ctx.clearRect(0, 0, width, height);
             
-            // Extract coordinates from machining section
             let points = [];
             let lastX = 0, lastZ = 0, lastA = 0;
             
@@ -980,7 +930,6 @@
             
             if (points.length === 0) return;
             
-            // Find bounds
             const xValues = points.map(p => p.x);
             const zValues = points.map(p => p.z);
             const minX = Math.min(...xValues);
@@ -988,7 +937,6 @@
             const minZ = Math.min(...zValues);
             const maxZ = Math.max(...zValues);
             
-            // 3D projection parameters
             if (!canvas.rotY) canvas.rotY = 0.3;
             if (!canvas.rotX) canvas.rotX = 0.2;
             
@@ -996,7 +944,6 @@
             const centerY = height / 2;
             const scale = Math.min(width, height) / 3;
             
-            // Mouse interaction for rotation
             let isDragging = false;
             let lastMouseX = 0;
             let lastMouseY = 0;
@@ -1019,43 +966,33 @@
                 }
             };
             
-            canvas.onmouseup = () => {
-                isDragging = false;
-            };
+            canvas.onmouseup = () => isDragging = false;
+            canvas.onmouseleave = () => isDragging = false;
             
-            canvas.onmouseleave = () => {
-                isDragging = false;
-            };
-            
-            // 3D to 2D projection
             function project3D(x, y, z) {
-                // Rotate around Y axis
                 const cosY = Math.cos(canvas.rotY);
                 const sinY = Math.sin(canvas.rotY);
                 const x1 = x * cosY - z * sinY;
                 const z1 = x * sinY + z * cosY;
                 
-                // Rotate around X axis
                 const cosX = Math.cos(canvas.rotX);
                 const sinX = Math.sin(canvas.rotX);
                 const y1 = y * cosX - z1 * sinX;
                 const z2 = y * sinX + z1 * cosX;
                 
-                // Project to 2D
                 const screenX = centerX + x1 * scale;
                 const screenY = centerY - y1 * scale;
                 
                 return { x: screenX, y: screenY, depth: z2 };
             }
             
-            // Draw coordinate axes
+            // Draw axes
             ctx.strokeStyle = '#ccc';
             ctx.lineWidth = 2;
             
             const axisLength = 1.5;
             const origin = project3D(0, 0, 0);
             
-            // X axis (red)
             ctx.strokeStyle = '#ff0000';
             const xAxis = project3D(axisLength, 0, 0);
             ctx.beginPath();
@@ -1063,7 +1000,6 @@
             ctx.lineTo(xAxis.x, xAxis.y);
             ctx.stroke();
             
-            // Y axis (green) - up/down
             ctx.strokeStyle = '#00ff00';
             const yAxis = project3D(0, axisLength, 0);
             ctx.beginPath();
@@ -1071,7 +1007,6 @@
             ctx.lineTo(yAxis.x, yAxis.y);
             ctx.stroke();
             
-            // Z axis (blue)
             ctx.strokeStyle = '#0000ff';
             const zAxis = project3D(0, 0, axisLength);
             ctx.beginPath();
@@ -1091,7 +1026,6 @@
                 const cz = Math.sin(angle) * cylinderRadius;
                 
                 const top = project3D(cx, maxZ, cz);
-                const bottom = project3D(cx, minZ, cz);
                 
                 if (i === 0) {
                     ctx.beginPath();
@@ -1128,7 +1062,8 @@
                 ctx.lineWidth = 2;
                 ctx.globalAlpha = 0.8;
                 
-                let projectedPoints = [];
+                ctx.beginPath();
+                let first = true;
                 
                 for (let point of points) {
                     const angleRad = ((point.a + offset) * Math.PI) / 180;
@@ -1137,16 +1072,13 @@
                     const y3d = point.z;
                     
                     const projected = project3D(x3d, y3d, z3d);
-                    projectedPoints.push(projected);
-                }
-                
-                // Sort by depth for proper drawing order
-                // (we'll draw all at once, but this helps with visibility)
-                ctx.beginPath();
-                ctx.moveTo(projectedPoints[0].x, projectedPoints[0].y);
-                
-                for (let i = 1; i < projectedPoints.length; i++) {
-                    ctx.lineTo(projectedPoints[i].x, projectedPoints[i].y);
+                    
+                    if (first) {
+                        ctx.moveTo(projected.x, projected.y);
+                        first = false;
+                    } else {
+                        ctx.lineTo(projected.x, projected.y);
+                    }
                 }
                 
                 ctx.stroke();
@@ -1154,7 +1086,6 @@
             
             ctx.globalAlpha = 1;
             
-            // Draw labels
             ctx.fillStyle = '#333';
             ctx.font = '14px sans-serif';
             ctx.textAlign = 'center';
