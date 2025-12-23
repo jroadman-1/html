@@ -419,6 +419,14 @@
                 <label for="optimizeToggle" style="cursor: pointer; margin: 0;">Optimize A-axis moves between operations (shortest rotation path)</label>
             </div>
             
+            <div class="toggle-group">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="resetToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <label for="resetToggle" style="cursor: pointer; margin: 0;">Use G92 to reset A-axis position after each pass (keeps values low)</label>
+            </div>
+            
             <div class="controls" style="margin-top: 20px;">
                 <div class="control-group">
                     <label for="rapidRate">Linear Rapid Rate (IPM):</label>
@@ -673,6 +681,7 @@
         
         document.getElementById('repetitions').addEventListener('input', updateCalculations);
         document.getElementById('optimizeToggle').addEventListener('change', updateCalculations);
+        document.getElementById('resetToggle').addEventListener('change', updateCalculations);
         document.getElementById('rapidRate').addEventListener('input', updateCalculations);
         document.getElementById('aRapidRate').addEventListener('input', updateCalculations);
         
@@ -712,6 +721,7 @@
             const reps = parseInt(document.getElementById('repetitions').value) || 1;
             const spacing = 360 / reps;
             const optimize = document.getElementById('optimizeToggle').checked;
+            const useReset = document.getElementById('resetToggle').checked;
             
             let output = [];
             
@@ -757,6 +767,14 @@
                     } else {
                         output.push(line);
                     }
+                }
+                
+                // Add G92 reset after this pass if enabled and not the last pass
+                if (useReset && rep < reps - 1) {
+                    // Normalize the current position to 0-360 range
+                    const normalizedA = lastEndA % 360;
+                    output.push(`G92 A${normalizedA.toFixed(3)} (Reset position counter to keep values manageable)`);
+                    lastEndA = normalizedA;
                 }
             }
             
