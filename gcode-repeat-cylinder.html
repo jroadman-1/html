@@ -729,19 +729,24 @@
             
             // Generate machining passes
             for (let rep = 0; rep < reps; rep++) {
-                const offset = rep * spacing;
+                const baseOffset = rep * spacing;
+                let actualOffset = baseOffset;
                 
                 if (rep > 0) {
                     output.push('');
-                    output.push(`(REPETITION ${rep + 1} - A OFFSET: +${offset.toFixed(3)})`);
+                    output.push(`(REPETITION ${rep + 1} - A OFFSET: +${baseOffset.toFixed(3)})`);
                     
                     // Calculate where we need to go
-                    const targetStartA = parsedData.minA + offset;
+                    const targetStartA = parsedData.minA + baseOffset;
                     
                     if (optimize) {
                         const move = shortestRotation(lastEndA, targetStartA);
                         const nonOptDistance = Math.abs(targetStartA - lastEndA);
                         output.push(`G0 A${move.angle.toFixed(3)} (Optimized: ${Math.abs(move.distance).toFixed(1)}° vs ${nonOptDistance.toFixed(1)}°)`);
+                        
+                        // Calculate the actual offset to use based on optimized position
+                        // If we optimized to target+360, we need to offset everything by baseOffset+360
+                        actualOffset = move.angle - parsedData.minA;
                     } else {
                         output.push(`G0 A${targetStartA.toFixed(3)}`);
                     }
@@ -752,7 +757,7 @@
                     const aMatch = line.match(/A([-+]?\d+\.?\d*)/);
                     if (aMatch) {
                         const originalA = parseFloat(aMatch[1]);
-                        const newA = originalA + offset;
+                        const newA = originalA + actualOffset;
                         const newLine = line.replace(/A[-+]?\d+\.?\d*/, `A${newA.toFixed(3)}`);
                         output.push(newLine);
                         lastEndA = newA;
