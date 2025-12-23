@@ -691,33 +691,15 @@
         }
         
         function shortestRotation(from, to) {
-            // Find the nearest equivalent angle considering continuous rotation
-            // Check target-360, target, target+360, and target+720
-            const options = [
-                { angle: to - 720, distance: (to - 720) - from },
-                { angle: to - 360, distance: (to - 360) - from },
-                { angle: to, distance: to - from },
-                { angle: to + 360, distance: (to + 360) - from },
-                { angle: to + 720, distance: (to + 720) - from }
-            ];
+            // Calculate how many full 360° rotations apart we are
+            const rotationDiff = from - to;
+            const fullRotations = Math.round(rotationDiff / 360);
             
-            // Find the option with minimum absolute distance
-            // But prefer forward motion if distances are close
-            let best = options[0];
-            let minAbsDist = Math.abs(best.distance);
+            // Add that many full rotations to the target to get close to current position
+            const optimizedTarget = to + (fullRotations * 360);
+            const distance = optimizedTarget - from;
             
-            for (let opt of options) {
-                const absDist = Math.abs(opt.distance);
-                
-                // If this distance is smaller, or if it's similar but goes forward
-                if (absDist < minAbsDist || 
-                    (Math.abs(absDist - minAbsDist) < 1 && opt.distance > 0)) {
-                    best = opt;
-                    minAbsDist = absDist;
-                }
-            }
-            
-            return { angle: best.angle, distance: best.distance };
+            return { angle: optimizedTarget, distance: distance };
         }
         
         document.getElementById('generateBtn').addEventListener('click', generateGCode);
