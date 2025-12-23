@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indexed Pattern Duplicator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            background: #fafafa;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-area:hover {
+            border-color: #007bff;
+            background: #f0f8ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .file-info {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #2e7d32;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        label {
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        input[type="number"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100%;
+        }
+        
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .readonly-field {
+            padding: 10px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: #007bff;
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        
+        .canvas-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .canvas-wrapper {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+            background: white;
+        }
+        
+        .canvas-title {
+            padding: 10px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            font-weight: 500;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            background: white;
+            cursor: grab;
+        }
+        
+        canvas:active {
+            cursor: grabbing;
+        }
+        
+        .button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .button-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .button-primary:hover {
+            background: #0056b3;
+        }
+        
+        .button-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .button-secondary {
+            background: #28a745;
+            color: white;
+        }
+        
+        .button-secondary:hover {
+            background: #218838;
+        }
+        
+        .button-secondary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .error {
+            padding: 15px;
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            border-radius: 4px;
+            color: #c62828;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Indexed Pattern Duplicator</h1>
+        <p class="subtitle">Upload a single-pass G-code file and duplicate it at indexed positions around a cylinder</p>
+        
+        <div class="section">
+            <div class="section-title">1. Upload G-code File</div>
+            <div class="upload-area" id="uploadArea">
+                <div style="font-size: 48px; margin-bottom: 10px;">📁</div>
+                <div style="font-size: 16px; margin-bottom: 5px;">Click to upload or drag and drop</div>
+                <div style="font-size: 12px; color: #999;">Single-pass G-code files (.nc, .gcode, .txt, .ngc)</div>
+                <input type="file" id="fileInput" accept=".nc,.gcode,.txt,.ngc">
+            </div>
+            <div id="fileInfo"></div>
+        </div>
+        
+        <div class="section" id="controlsSection" style="display: none;">
+            <div class="section-title">2. Configure Pattern</div>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="repetitions">Number of Repetitions:</label>
+                    <input type="number" id="repetitions" min="1" max="360" value="16">
+                </div>
+                <div class="control-group">
+                    <label>Index Spacing (degrees):</label>
+                    <div class="readonly-field" id="spacing">22.500°</div>
+                </div>
+            </div>
+            
+            <div class="toggle-group">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="loopToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <label for="loopToggle" style="cursor: pointer; margin: 0;">Use loop (compact file with o100 do/while)</label>
+            </div>
+            
+            <div id="infoPanel" class="info-grid" style="display: none;">
+                <div class="info-item">
+                    <div class="info-label">Setup Lines</div>
+                    <div class="info-value" id="setupLines">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Machining Lines</div>
+                    <div class="info-value" id="machiningLines">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Footer Lines</div>
+                    <div class="info-value" id="footerLines">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Output Lines</div>
+                    <div class="info-value" id="outputLines">-</div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="button button-primary" id="generateBtn">Generate G-code</button>
+                <button class="button button-secondary" id="downloadBtn" disabled>Download G-code</button>
+            </div>
+            
+            <div id="errorMessage"></div>
+        </div>
+        
+        <div class="section" id="previewSection" style="display: none;">
+            <div class="section-title">3. Visual Preview</div>
+            <div class="canvas-container">
+                <div class="canvas-wrapper">
+                    <div class="canvas-title">Top View - Index Positions (Click and drag to rotate)</div>
+                    <canvas id="previewCanvas" width="800" height="600"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let uploadedFile = null;
+        let parsedData = null;
+        let generatedGCode = null;
+        
+        // Prevent wheel events on number inputs
+        document.addEventListener('wheel', function(e) {
+            if (document.activeElement.type === 'number') {
+                document.activeElement.blur();
+            }
+        });
+        
+        // Upload area handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function handleFile(file) {
+            uploadedFile = file;
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                const content = e.target.result;
+                parseGCode(content);
+                showFileInfo(file);
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        function showFileInfo(file) {
+            const fileInfo = document.getElementById('fileInfo');
+            fileInfo.innerHTML = `
+                <div class="file-info">
+                    <strong>File loaded:</strong> ${file.name} (${(file.size / 1024).toFixed(2)} KB)
+                </div>
+            `;
+            document.getElementById('controlsSection').style.display = 'block';
+        }
+        
+        function parseGCode(content) {
+            const lines = content.split('\n').map(line => line.trim());
+            
+            // Find M5 (spindle off) and M9 (coolant off) to identify footer
+            let m5LineIndex = -1;
+            let m9LineIndex = -1;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.includes('M5') && m5LineIndex === -1) {
+                    m5LineIndex = i;
+                }
+                if (line.includes('M9') && m9LineIndex === -1) {
+                    m9LineIndex = i;
+                }
+            }
+            
+            // Footer starts at M5 or M9, whichever comes first
+            const footerStartIndex = m5LineIndex !== -1 ? m5LineIndex : (m9LineIndex !== -1 ? m9LineIndex : lines.length);
+            
+            // Structure:
+            // Setup: Beginning through spindle start (M3) + coolant on (M8)
+            // Machining: After M8 through line before M5/M9
+            // Footer: M5/M9 onwards
+            
+            let m8LineIndex = -1;
+            for (let i = 0; i < footerStartIndex; i++) {
+                if (lines[i].includes('M8')) {
+                    m8LineIndex = i;
+                    break;
+                }
+            }
+            
+            const setupEndIndex = m8LineIndex !== -1 ? m8LineIndex : 20; // Default to first 20 lines if no M8
+            
+            const setup = lines.slice(0, setupEndIndex + 1);
+            const machining = lines.slice(setupEndIndex + 1, footerStartIndex);
+            const footer = lines.slice(footerStartIndex);
+            
+            parsedData = {
+                lines: lines,
+                setup: setup,
+                machining: machining,
+                footer: footer
+            };
+            
+            document.getElementById('setupLines').textContent = setup.length;
+            document.getElementById('machiningLines').textContent = machining.length;
+            document.getElementById('footerLines').textContent = footer.length;
+            document.getElementById('infoPanel').style.display = 'grid';
+            
+            updateCalculations();
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = `<div class="error">${message}</div>`;
+        }
+        
+        function clearError() {
+            document.getElementById('errorMessage').innerHTML = '';
+        }
+        
+        document.getElementById('repetitions').addEventListener('input', updateCalculations);
+        document.getElementById('loopToggle').addEventListener('change', updateCalculations);
+        
+        function updateCalculations() {
+            if (!parsedData) return;
+            
+            const reps = parseInt(document.getElementById('repetitions').value) || 1;
+            const spacing = 360 / reps;
+            
+            document.getElementById('spacing').textContent = spacing.toFixed(3) + '°';
+            
+            clearError();
+        }
+        
+        document.getElementById('generateBtn').addEventListener('click', generateGCode);
+        
+        function generateGCode() {
+            if (!parsedData) return;
+            
+            clearError();
+            
+            const reps = parseInt(document.getElementById('repetitions').value) || 1;
+            const spacing = 360 / reps;
+            const useLoop = document.getElementById('loopToggle').checked;
+            
+            let output = [];
+            
+            // Add setup section
+            output.push(...parsedData.setup);
+            output.push('');
+            
+            if (useLoop) {
+                // Loop mode - compact with o100 do/while
+                output.push('#1 = 0');
+                output.push(' o100 do');
+                output.push('');
+                
+                // Add A-axis positioning at current angle
+                output.push('  A#1');
+                output.push('');
+                
+                // Add machining section
+                for (let line of parsedData.machining) {
+                    output.push(line);
+                }
+                output.push('');
+                
+                // Increment and loop check
+                output.push(`#1 = [#1+${spacing.toFixed(3)}]`);
+                output.push(' o100 while[#1 LT 360]');
+                output.push(' (print,loop finished)');
+                output.push('');
+            } else {
+                // Sequential mode - fully expanded
+                for (let rep = 0; rep < reps; rep++) {
+                    const angle = rep * spacing;
+                    
+                    if (rep > 0) {
+                        output.push('');
+                        output.push(`(REPETITION ${rep + 1} - A${angle.toFixed(3)})`);
+                    }
+                    
+                    // Add A-axis positioning
+                    output.push(`G0 A${angle.toFixed(3)}`);
+                    output.push('');
+                    
+                    // Add machining section
+                    for (let line of parsedData.machining) {
+                        output.push(line);
+                    }
+                }
+                output.push('');
+            }
+            
+            // Add footer section
+            output.push(...parsedData.footer);
+            
+            generatedGCode = output.join('\n');
+            
+            // Update info
+            document.getElementById('outputLines').textContent = output.length;
+            
+            document.getElementById('downloadBtn').disabled = false;
+            
+            // Draw preview
+            drawPreview(reps, spacing);
+            document.getElementById('previewSection').style.display = 'block';
+        }
+        
+        document.getElementById('downloadBtn').addEventListener('click', downloadGCode);
+        
+        function downloadGCode() {
+            if (!generatedGCode || !uploadedFile) return;
+            
+            const originalName = uploadedFile.name.replace(/\.[^/.]+$/, '');
+            const reps = parseInt(document.getElementById('repetitions').value) || 1;
+            const useLoop = document.getElementById('loopToggle').checked;
+            const suffix = useLoop ? '_loop' : '_expanded';
+            const filename = `${originalName}_${reps}x${suffix}.nc`;
+            
+            const blob = new Blob([generatedGCode], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function drawPreview(reps, spacing) {
+            const canvas = document.getElementById('previewCanvas');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            if (!canvas.rotZ) canvas.rotZ = 0;
+            
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = Math.min(width, height) / 3;
+            
+            // Mouse interaction
+            let isDragging = false;
+            let lastMouseX = 0;
+            
+            canvas.onmousedown = (e) => {
+                isDragging = true;
+                lastMouseX = e.offsetX;
+            };
+            
+            canvas.onmousemove = (e) => {
+                if (isDragging) {
+                    const dx = e.offsetX - lastMouseX;
+                    canvas.rotZ += dx * 0.01;
+                    lastMouseX = e.offsetX;
+                    drawPreview(reps, spacing);
+                }
+            };
+            
+            canvas.onmouseup = () => isDragging = false;
+            canvas.onmouseleave = () => isDragging = false;
+            
+            // Draw cylinder outline
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Draw center point
+            ctx.fillStyle = '#999';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw index positions
+            for (let i = 0; i < reps; i++) {
+                const angle = (i * spacing + canvas.rotZ * 180 / Math.PI) * Math.PI / 180;
+                const x = centerX + radius * Math.cos(angle - Math.PI / 2);
+                const y = centerY + radius * Math.sin(angle - Math.PI / 2);
+                
+                // Draw line from center
+                ctx.strokeStyle = '#2196F3';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                
+                // Draw position marker
+                ctx.fillStyle = '#2196F3';
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw position number
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText((i + 1).toString(), x, y);
+                
+                // Draw angle label
+                const labelRadius = radius + 30;
+                const labelX = centerX + labelRadius * Math.cos(angle - Math.PI / 2);
+                const labelY = centerY + labelRadius * Math.sin(angle - Math.PI / 2);
+                
+                ctx.fillStyle = '#333';
+                ctx.font = '11px sans-serif';
+                ctx.fillText(`${(i * spacing).toFixed(1)}°`, labelX, labelY);
+            }
+            
+            // Draw title
+            ctx.fillStyle = '#333';
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Click and drag to rotate view', width / 2, 30);
+            ctx.fillText(`${reps} positions at ${spacing.toFixed(1)}° spacing`, width / 2, height - 20);
+        }
+    </script>
+</body>
+</html>
