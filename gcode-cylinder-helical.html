@@ -376,7 +376,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Helical Pattern Duplicator</h1>
+        <h1>Helical Pattern Duplicator-3</h1>
         <p class="subtitle">Upload a G-code file with a helical toolpath and duplicate it around a cylinder with optimized A-axis motion</p>
         
         <div class="section">
@@ -592,15 +592,9 @@
         function parseGCode(content) {
             const lines = content.split('\n').map(line => line.trim());
             
-            // NEW APPROACH: Find the complete setup section and footer section
-            // Setup ends AFTER the initial A positioning
-            // Footer starts with retracts/M5/M9
-            
-            let firstALineIndex = -1;
-            let lastCuttingALineIndex = -1;
-            let m5LineIndex = -1;
-            
+            // Find all A-axis moves and Z moves
             let allALines = [];
+            let zMoves = [];
             
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
@@ -610,20 +604,13 @@
                 if (aMatch) {
                     const aValue = parseFloat(aMatch[1]);
                     allALines.push({ index: i, value: aValue, line: line });
-                    
-                    if (firstALineIndex === -1) {
-                        firstALineIndex = i;
-                    }
-                    
-                    // Track last cutting A-axis line (not a reset near 0)
-                    if (Math.abs(aValue) > 10 && Math.abs(aValue - 360) > 10) {
-                        lastCuttingALineIndex = i;
-                    }
                 }
                 
-                // Find M5 (spindle off) - marks start of footer
-                if (line.includes('M5') && m5LineIndex === -1) {
-                    m5LineIndex = i;
+                // Find Z moves
+                const zMatch = line.match(/Z([-+]?\d+\.?\d*)/);
+                if (zMatch) {
+                    const zValue = parseFloat(zMatch[1]);
+                    zMoves.push({ index: i, value: zValue, line: line });
                 }
             }
             
@@ -632,17 +619,68 @@
                 return;
             }
             
-            // Structure:
-            // Setup: Everything UP TO AND INCLUDING the first A positioning line
-            // Machining: After first A line through the line BEFORE M5
-            // Footer: M5 onwards
+            // Find first A-axis move
+            const firstALineIndex = allALines[0].index;
             
-            const setup = lines.slice(0, firstALineIndex + 1);  // Include the initial A positioning
-            const machining = lines.slice(firstALineIndex + 1, m5LineIndex);  // Everything between
-            const footer = lines.slice(m5LineIndex);  // From M5 onwards
+            // Strategy: Find where machining actually ends by detecting Z retraction
+            // 1. Find the minimum Z value during cutting (the actual cutting depth)
+            // 2. Find the first Z move after that which goes significantly upward (retraction)
+            
+            let minCuttingZ = Infinity;
+            let lastLowZIndex = -1;
+            
+            // Find the minimum Z during cutting and track the last time we're at that depth
+            for (let zm of zMoves) {
+                if (zm.index > firstALineIndex && zm.value < 0.5) {
+                    if (zm.value < minCuttingZ) {
+                        minCuttingZ = zm.value;
+                    }
+                    // Track last occurrence of low Z values
+                    if (zm.value < minCuttingZ + 0.05) {
+                        lastLowZIndex = zm.index;
+                    }
+                }
+            }
+            
+            // Find the first Z move that retracts significantly upward after cutting
+            let footerStartIndex = -1;
+            for (let zm of zMoves) {
+                if (zm.index > lastLowZIndex) {
+                    // If Z moves up by more than 0.1" from cutting depth, it's a retraction
+                    if (zm.value > minCuttingZ + 0.1) {
+                        footerStartIndex = zm.index;
+                        break;
+                    }
+                }
+            }
+            
+            // If no retraction found, fall back to M5
+            if (footerStartIndex === -1) {
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].includes('M5')) {
+                        footerStartIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            // Default to end of file if nothing found
+            if (footerStartIndex === -1) {
+                footerStartIndex = lines.length;
+            }
+            
+            const setup = lines.slice(0, firstALineIndex + 1);
+            const machining = lines.slice(firstALineIndex + 1, footerStartIndex);
+            const footer = lines.slice(footerStartIndex);
             
             // Get A-axis range from machining section only
-            const machiningAValues = allALines.filter(a => a.index > firstALineIndex && a.index < m5LineIndex);
+            const machiningAValues = allALines.filter(a => a.index > firstALineIndex && a.index < footerStartIndex);
+            
+            if (machiningAValues.length === 0) {
+                showError('No A-axis moves found in the machining section.');
+                return;
+            }
+            
             const minA = Math.min(...machiningAValues.map(a => a.value));
             const maxA = Math.max(...machiningAValues.map(a => a.value));
             
@@ -656,7 +694,9 @@
                 minA: minA,
                 maxA: maxA,
                 aRange: maxA - minA,
-                initialAPosition: allALines[0].value
+                initialAPosition: allALines[0].value,
+                minCuttingZ: minCuttingZ,
+                footerStartIndex: footerStartIndex
             };
             
             document.getElementById('originalRange').textContent = 
