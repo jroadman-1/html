@@ -376,7 +376,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Helical Pattern Duplicator Debug</h1>
+        <h1>Helical Pattern Duplicator</h1>
         <p class="subtitle">Upload a G-code file with a helical toolpath and duplicate it around a cylinder with optimized A-axis motion</p>
         
         <div class="section">
@@ -631,7 +631,8 @@
             
             // Find the minimum Z during cutting and track the last time we're at that depth
             for (let zm of zMoves) {
-                if (zm.index > firstALineIndex && zm.value < 0.5) {
+                // Only consider positive Z values less than 0.5 (ignore machine home positions)
+                if (zm.index > firstALineIndex && zm.value > 0 && zm.value < 0.5) {
                     if (zm.value < minCuttingZ) {
                         minCuttingZ = zm.value;
                     }
