@@ -178,6 +178,36 @@
             font-weight: 600;
             color: #333;
         }
+        
+        table {
+            font-size: 14px;
+        }
+        
+        table input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        table input[type="number"]:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .delete-btn {
+            padding: 6px 12px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .delete-btn:hover {
+            background: #c82333;
+        }
     </style>
 </head>
 <body>
@@ -212,18 +242,39 @@
         </div>
         
         <div class="section">
-            <div class="section-title">2. Draw Profile Cross-Section</div>
+            <div class="section-title">2. Define Profile Points</div>
             <div class="instructions">
-                <strong>Instructions:</strong> Click to add points to define your profile outline. The profile represents a cross-section view of the cylindrical object. 
-                X-axis = radial distance from center, Z-axis = length along cylinder. Start from one end and work to the other.
+                <strong>Instructions:</strong> Enter X (radius from centerline) and Z (position along cylinder) coordinates to define your profile. 
+                Points will be connected in the order entered. X must be positive (radius). Add points from one end of the profile to the other.
             </div>
+            
+            <div style="margin-bottom: 20px;">
+                <button class="button button-primary" id="addPointBtn">Add Point</button>
+                <button class="button button-secondary" id="clearPointsBtn">Clear All Points</button>
+            </div>
+            
+            <div style="overflow-x: auto; margin-bottom: 20px;">
+                <table id="pointsTable" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                            <th style="padding: 10px; text-align: left; width: 60px;">Point</th>
+                            <th style="padding: 10px; text-align: left;">X (Radius - inches)</th>
+                            <th style="padding: 10px; text-align: left;">Z (Position - inches)</th>
+                            <th style="padding: 10px; text-align: center; width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pointsTableBody">
+                        <tr>
+                            <td colspan="4" style="padding: 20px; text-align: center; color: #999;">
+                                No points defined. Click "Add Point" to start.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
             <div class="canvas-container">
                 <canvas id="profileCanvas" width="800" height="400"></canvas>
-            </div>
-            <div>
-                <button class="button button-secondary" id="clearBtn">Clear Profile</button>
-                <button class="button button-secondary" id="undoBtn">Undo Last Point</button>
-                <button class="button button-primary" id="closeProfileBtn">Close Profile</button>
             </div>
             
             <div class="info-panel" id="profileInfo" style="display: none;">
@@ -261,12 +312,97 @@
         const ctx = canvas.getContext('2d');
         
         let points = [];
-        let profileClosed = false;
         let generatedGCode = null;
         
         const scale = 100; // pixels per inch
         const originX = 50;
         const originY = canvas.height / 2;
+        
+        function addPointRow(x = 0, z = 0) {
+            const tbody = document.getElementById('pointsTableBody');
+            
+            // Remove "no points" message if present
+            if (points.length === 0) {
+                tbody.innerHTML = '';
+            }
+            
+            const pointNum = points.length + 1;
+            const row = document.createElement('tr');
+            row.style.borderBottom = '1px solid #dee2e6';
+            row.innerHTML = `
+                <td style="padding: 10px; font-weight: 600;">${pointNum}</td>
+                <td style="padding: 10px;">
+                    <input type="number" class="point-x" value="${x.toFixed(4)}" step="0.0001" min="0">
+                </td>
+                <td style="padding: 10px;">
+                    <input type="number" class="point-z" value="${z.toFixed(4)}" step="0.0001">
+                </td>
+                <td style="padding: 10px; text-align: center;">
+                    <button class="delete-btn" onclick="deletePoint(${points.length})">Delete</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+            
+            points.push({ x: x, z: z, row: row });
+            
+            // Add event listeners to update on change
+            const xInput = row.querySelector('.point-x');
+            const zInput = row.querySelector('.point-z');
+            
+            xInput.addEventListener('input', () => {
+                const idx = Array.from(tbody.children).indexOf(row);
+                points[idx].x = parseFloat(xInput.value) || 0;
+                drawProfile();
+            });
+            
+            zInput.addEventListener('input', () => {
+                const idx = Array.from(tbody.children).indexOf(row);
+                points[idx].z = parseFloat(zInput.value) || 0;
+                drawProfile();
+            });
+            
+            drawProfile();
+        }
+        
+        function deletePoint(index) {
+            points.splice(index, 1);
+            rebuildTable();
+            drawProfile();
+        }
+        
+        function rebuildTable() {
+            const tbody = document.getElementById('pointsTableBody');
+            tbody.innerHTML = '';
+            
+            if (points.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="padding: 20px; text-align: center; color: #999;">
+                            No points defined. Click "Add Point" to start.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            const tempPoints = [...points];
+            points = [];
+            
+            for (let p of tempPoints) {
+                addPointRow(p.x, p.z);
+            }
+        }
+        
+        document.getElementById('addPointBtn').addEventListener('click', () => {
+            addPointRow(0.5, 0);
+        });
+        
+        document.getElementById('clearPointsBtn').addEventListener('click', () => {
+            if (points.length > 0 && !confirm('Clear all points?')) return;
+            points = [];
+            rebuildTable();
+            drawProfile();
+        });
         
         function drawGrid() {
             ctx.strokeStyle = '#e0e0e0';
@@ -308,13 +444,31 @@
             ctx.font = '12px sans-serif';
             ctx.fillText('Z (along cylinder)', canvas.width - 120, originY - 10);
             ctx.fillText('X (radius)', originX + 10, 20);
+            
+            // Draw scale markers
+            ctx.fillStyle = '#666';
+            ctx.font = '10px sans-serif';
+            for (let i = 0; i <= 6; i++) {
+                const z = i * 0.5;
+                const px = originX + z * scale;
+                ctx.fillText(z.toFixed(1), px - 10, originY + 15);
+            }
+            
+            for (let i = 1; i <= 3; i++) {
+                const x = i * 0.5;
+                const py = originY - x * scale;
+                ctx.fillText(x.toFixed(1), originX - 35, py + 5);
+            }
         }
         
         function drawProfile() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawGrid();
             
-            if (points.length === 0) return;
+            if (points.length === 0) {
+                updateInfo();
+                return;
+            }
             
             // Draw points
             ctx.fillStyle = '#2196F3';
@@ -322,35 +476,42 @@
                 const px = originX + p.z * scale;
                 const py = originY - p.x * scale;
                 ctx.beginPath();
-                ctx.arc(px, py, 4, 0, Math.PI * 2);
+                ctx.arc(px, py, 5, 0, Math.PI * 2);
                 ctx.fill();
+                
+                // Draw point number
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const idx = points.indexOf(p) + 1;
+                ctx.fillText(idx, px, py);
+                ctx.fillStyle = '#2196F3';
             }
             
-            // Draw lines
-            ctx.strokeStyle = '#2196F3';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            const p0 = points[0];
-            ctx.moveTo(originX + p0.z * scale, originY - p0.x * scale);
-            
-            for (let i = 1; i < points.length; i++) {
-                const p = points[i];
-                ctx.lineTo(originX + p.z * scale, originY - p.x * scale);
+            // Draw lines connecting points
+            if (points.length > 1) {
+                ctx.strokeStyle = '#2196F3';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                const p0 = points[0];
+                ctx.moveTo(originX + p0.z * scale, originY - p0.x * scale);
+                
+                for (let i = 1; i < points.length; i++) {
+                    const p = points[i];
+                    ctx.lineTo(originX + p.z * scale, originY - p.x * scale);
+                }
+                
+                ctx.stroke();
             }
             
-            if (profileClosed && points.length > 2) {
-                ctx.closePath();
-            }
-            
-            ctx.stroke();
-            
-            // Update info
             updateInfo();
         }
         
         function updateInfo() {
             if (points.length === 0) {
                 document.getElementById('profileInfo').style.display = 'none';
+                document.getElementById('generateBtn').disabled = true;
                 return;
             }
             
@@ -358,70 +519,26 @@
             document.getElementById('pointCount').textContent = points.length;
             
             const maxX = Math.max(...points.map(p => p.x));
-            document.getElementById('maxRadius').textContent = maxX.toFixed(3) + '"';
+            document.getElementById('maxRadius').textContent = maxX.toFixed(4) + '"';
             
             const maxZ = Math.max(...points.map(p => p.z));
             const minZ = Math.min(...points.map(p => p.z));
-            document.getElementById('profileLength').textContent = (maxZ - minZ).toFixed(3) + '"';
+            document.getElementById('profileLength').textContent = (maxZ - minZ).toFixed(4) + '"';
             
-            // Enable generate button if we have at least 3 points
-            document.getElementById('generateBtn').disabled = points.length < 3;
+            document.getElementById('generateBtn').disabled = points.length < 2;
         }
-        
-        canvas.addEventListener('click', (e) => {
-            if (profileClosed) return;
-            
-            const rect = canvas.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const clickY = e.clientY - rect.top;
-            
-            // Convert to profile coordinates
-            const z = (clickX - originX) / scale;
-            const x = (originY - clickY) / scale;
-            
-            // Only allow positive X (radius must be positive)
-            if (x < 0) {
-                alert('Radius must be positive (click above the centerline)');
-                return;
-            }
-            
-            points.push({ x: x, z: z });
-            drawProfile();
-        });
-        
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            points = [];
-            profileClosed = false;
-            drawProfile();
-        });
-        
-        document.getElementById('undoBtn').addEventListener('click', () => {
-            if (points.length > 0) {
-                points.pop();
-                profileClosed = false;
-                drawProfile();
-            }
-        });
-        
-        document.getElementById('closeProfileBtn').addEventListener('click', () => {
-            if (points.length < 3) {
-                alert('Need at least 3 points to close profile');
-                return;
-            }
-            profileClosed = true;
-            drawProfile();
-        });
         
         document.getElementById('generateBtn').addEventListener('click', generateGCode);
         document.getElementById('downloadBtn').addEventListener('click', downloadGCode);
         
         function generateGCode() {
-            if (points.length < 3) {
-                alert('Need at least 3 points to generate G-code');
+            if (points.length < 2) {
+                alert('Need at least 2 points to generate G-code');
                 return;
             }
             
             const toolDia = parseFloat(document.getElementById('toolDiameter').value);
+            const toolRadius = toolDia / 2;
             const spindleRPM = parseInt(document.getElementById('spindleRPM').value);
             const aAxisSpeed = parseFloat(document.getElementById('aAxisSpeed').value);
             const maxDepth = parseFloat(document.getElementById('maxDepthOfCut').value);
@@ -429,6 +546,12 @@
             
             // Sort points by Z coordinate
             const sortedPoints = [...points].sort((a, b) => a.z - b.z);
+            
+            // Apply tool radius offset to X values
+            const offsetPoints = sortedPoints.map(p => ({
+                x: p.x + toolRadius,
+                z: p.z
+            }));
             
             let gcode = [];
             gcode.push('%');
@@ -447,43 +570,53 @@
             gcode.push('M8');
             gcode.push('');
             
-            // Calculate number of passes needed
-            const maxRadius = Math.max(...sortedPoints.map(p => p.x));
+            // Calculate number of passes
+            const maxRadius = Math.max(...offsetPoints.map(p => p.x));
             const numPasses = Math.ceil(maxRadius / maxDepth);
             
             gcode.push(`(TOTAL PASSES: ${numPasses})`);
+            gcode.push(`(MAX RADIUS: ${maxRadius.toFixed(4)})`);
             gcode.push('');
             
-            // Generate toolpath for each pass
+            // For each pass, we'll rotate 360 degrees while following the profile
+            const degreesPerPass = 360;
+            
             for (let pass = 1; pass <= numPasses; pass++) {
                 const currentDepth = Math.min(pass * maxDepth, maxRadius);
                 
                 gcode.push(`(PASS ${pass} - DEPTH: ${currentDepth.toFixed(4)})`);
                 
-                // Move to start position
-                const startPoint = sortedPoints[0];
-                gcode.push(`G0 X${startPoint.x.toFixed(4)} Z${startPoint.z.toFixed(4)}`);
+                // Rapids to start
+                gcode.push(`G0 Z${(sortedPoints[0].z - 0.1).toFixed(4)}`);
+                gcode.push(`G0 X${(offsetPoints[0].x + 0.1).toFixed(4)}`);
                 gcode.push('G0 A0.000');
                 
-                // Calculate feed rate (simplified for now)
-                const avgRadius = currentDepth;
-                const surfaceSpeed = aAxisSpeed * (2 * Math.PI * avgRadius / 360);
-                const feedRate = Math.max(1, surfaceSpeed * 0.5);
+                // Calculate feed rate based on chip load
+                // Feed rate = RPM × number of flutes × chip load
+                const numFlutes = 2; // Assume 2-flute endmill
+                const linearFeedRate = spindleRPM * numFlutes * feedPerTooth;
                 
-                // Start rotation and cutting
-                gcode.push(`F${feedRate.toFixed(1)}`);
+                // Move to start position
+                const startX = Math.min(offsetPoints[0].x, currentDepth);
+                gcode.push(`G1 X${startX.toFixed(4)} F${linearFeedRate.toFixed(1)}`);
+                gcode.push(`G1 Z${offsetPoints[0].z.toFixed(4)}`);
                 
                 // Follow profile while rotating A-axis
-                for (let i = 0; i < sortedPoints.length; i++) {
-                    const p = sortedPoints[i];
-                    const targetX = Math.min(p.x, currentDepth);
-                    gcode.push(`G1 X${targetX.toFixed(4)} Z${p.z.toFixed(4)} A${aAxisSpeed.toFixed(3)}`);
+                let currentA = 0;
+                const degPerPoint = degreesPerPass / (offsetPoints.length - 1);
+                
+                for (let i = 1; i < offsetPoints.length; i++) {
+                    currentA += degPerPoint;
+                    const targetX = Math.min(offsetPoints[i].x, currentDepth);
+                    gcode.push(`G1 X${targetX.toFixed(4)} Z${offsetPoints[i].z.toFixed(4)} A${currentA.toFixed(3)}`);
                 }
                 
+                // Retract
+                gcode.push(`G0 X${(currentDepth + 0.2).toFixed(4)}`);
                 gcode.push('');
             }
             
-            // Retract and finish
+            // Finish
             gcode.push('G0 Z1.0');
             gcode.push('G0 A0.000');
             gcode.push('M5');
