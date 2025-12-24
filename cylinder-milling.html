@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cylindrical Profile Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        label {
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        input[type="number"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .canvas-container {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            background: #fafafa;
+            margin-bottom: 20px;
+        }
+        
+        canvas {
+            display: block;
+            background: white;
+            border: 1px solid #ccc;
+            cursor: crosshair;
+            margin: 0 auto;
+        }
+        
+        .instructions {
+            padding: 15px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #1565C0;
+        }
+        
+        .button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        
+        .button-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .button-primary:hover {
+            background: #0056b3;
+        }
+        
+        .button-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .button-secondary:hover {
+            background: #545b62;
+        }
+        
+        .button-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .button-success:hover {
+            background: #218838;
+        }
+        
+        .button-success:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .info-panel {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: #666;
+        }
+        
+        .info-value {
+            font-weight: 600;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cylindrical Profile Generator</h1>
+        <p class="subtitle">Draw a profile cross-section and generate G-code for 4-axis cylindrical milling</p>
+        
+        <div class="section">
+            <div class="section-title">1. Machine Parameters</div>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="toolDiameter">Tool Diameter (inches):</label>
+                    <input type="number" id="toolDiameter" value="0.09375" step="0.001" min="0.001">
+                </div>
+                <div class="control-group">
+                    <label for="spindleRPM">Spindle RPM:</label>
+                    <input type="number" id="spindleRPM" value="18000" step="100" min="100">
+                </div>
+                <div class="control-group">
+                    <label for="aAxisSpeed">A-axis Speed (deg/min):</label>
+                    <input type="number" id="aAxisSpeed" value="3600" step="100" min="100">
+                </div>
+                <div class="control-group">
+                    <label for="maxDepthOfCut">Max Depth of Cut (inches):</label>
+                    <input type="number" id="maxDepthOfCut" value="0.020" step="0.001" min="0.001">
+                </div>
+                <div class="control-group">
+                    <label for="feedPerTooth">Feed Per Tooth (inches):</label>
+                    <input type="number" id="feedPerTooth" value="0.002" step="0.0001" min="0.0001">
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">2. Draw Profile Cross-Section</div>
+            <div class="instructions">
+                <strong>Instructions:</strong> Click to add points to define your profile outline. The profile represents a cross-section view of the cylindrical object. 
+                X-axis = radial distance from center, Z-axis = length along cylinder. Start from one end and work to the other.
+            </div>
+            <div class="canvas-container">
+                <canvas id="profileCanvas" width="800" height="400"></canvas>
+            </div>
+            <div>
+                <button class="button button-secondary" id="clearBtn">Clear Profile</button>
+                <button class="button button-secondary" id="undoBtn">Undo Last Point</button>
+                <button class="button button-primary" id="closeProfileBtn">Close Profile</button>
+            </div>
+            
+            <div class="info-panel" id="profileInfo" style="display: none;">
+                <div class="info-row">
+                    <span class="info-label">Points:</span>
+                    <span class="info-value" id="pointCount">0</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Max Radius:</span>
+                    <span class="info-value" id="maxRadius">0.000"</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Profile Length:</span>
+                    <span class="info-value" id="profileLength">0.000"</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">3. Generate G-code</div>
+            <button class="button button-success" id="generateBtn" disabled>Generate G-code</button>
+            <button class="button button-success" id="downloadBtn" disabled>Download G-code</button>
+        </div>
+    </div>
+
+    <script>
+        // Prevent wheel events on number inputs
+        document.addEventListener('wheel', function(e) {
+            if (document.activeElement.type === 'number') {
+                document.activeElement.blur();
+            }
+        });
+        
+        const canvas = document.getElementById('profileCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let points = [];
+        let profileClosed = false;
+        let generatedGCode = null;
+        
+        const scale = 100; // pixels per inch
+        const originX = 50;
+        const originY = canvas.height / 2;
+        
+        function drawGrid() {
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            
+            // Vertical lines (every 0.5")
+            for (let i = 0; i < canvas.width; i += scale * 0.5) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            
+            // Horizontal lines (every 0.5")
+            for (let i = 0; i < canvas.height; i += scale * 0.5) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+            
+            // Centerline (Z-axis)
+            ctx.strokeStyle = '#2196F3';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, originY);
+            ctx.lineTo(canvas.width, originY);
+            ctx.stroke();
+            
+            // Radius axis
+            ctx.strokeStyle = '#F44336';
+            ctx.beginPath();
+            ctx.moveTo(originX, 0);
+            ctx.lineTo(originX, canvas.height);
+            ctx.stroke();
+            
+            // Labels
+            ctx.fillStyle = '#333';
+            ctx.font = '12px sans-serif';
+            ctx.fillText('Z (along cylinder)', canvas.width - 120, originY - 10);
+            ctx.fillText('X (radius)', originX + 10, 20);
+        }
+        
+        function drawProfile() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            
+            if (points.length === 0) return;
+            
+            // Draw points
+            ctx.fillStyle = '#2196F3';
+            for (let p of points) {
+                const px = originX + p.z * scale;
+                const py = originY - p.x * scale;
+                ctx.beginPath();
+                ctx.arc(px, py, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Draw lines
+            ctx.strokeStyle = '#2196F3';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            const p0 = points[0];
+            ctx.moveTo(originX + p0.z * scale, originY - p0.x * scale);
+            
+            for (let i = 1; i < points.length; i++) {
+                const p = points[i];
+                ctx.lineTo(originX + p.z * scale, originY - p.x * scale);
+            }
+            
+            if (profileClosed && points.length > 2) {
+                ctx.closePath();
+            }
+            
+            ctx.stroke();
+            
+            // Update info
+            updateInfo();
+        }
+        
+        function updateInfo() {
+            if (points.length === 0) {
+                document.getElementById('profileInfo').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('profileInfo').style.display = 'block';
+            document.getElementById('pointCount').textContent = points.length;
+            
+            const maxX = Math.max(...points.map(p => p.x));
+            document.getElementById('maxRadius').textContent = maxX.toFixed(3) + '"';
+            
+            const maxZ = Math.max(...points.map(p => p.z));
+            const minZ = Math.min(...points.map(p => p.z));
+            document.getElementById('profileLength').textContent = (maxZ - minZ).toFixed(3) + '"';
+            
+            // Enable generate button if we have at least 3 points
+            document.getElementById('generateBtn').disabled = points.length < 3;
+        }
+        
+        canvas.addEventListener('click', (e) => {
+            if (profileClosed) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            // Convert to profile coordinates
+            const z = (clickX - originX) / scale;
+            const x = (originY - clickY) / scale;
+            
+            // Only allow positive X (radius must be positive)
+            if (x < 0) {
+                alert('Radius must be positive (click above the centerline)');
+                return;
+            }
+            
+            points.push({ x: x, z: z });
+            drawProfile();
+        });
+        
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            points = [];
+            profileClosed = false;
+            drawProfile();
+        });
+        
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            if (points.length > 0) {
+                points.pop();
+                profileClosed = false;
+                drawProfile();
+            }
+        });
+        
+        document.getElementById('closeProfileBtn').addEventListener('click', () => {
+            if (points.length < 3) {
+                alert('Need at least 3 points to close profile');
+                return;
+            }
+            profileClosed = true;
+            drawProfile();
+        });
+        
+        document.getElementById('generateBtn').addEventListener('click', generateGCode);
+        document.getElementById('downloadBtn').addEventListener('click', downloadGCode);
+        
+        function generateGCode() {
+            if (points.length < 3) {
+                alert('Need at least 3 points to generate G-code');
+                return;
+            }
+            
+            const toolDia = parseFloat(document.getElementById('toolDiameter').value);
+            const spindleRPM = parseInt(document.getElementById('spindleRPM').value);
+            const aAxisSpeed = parseFloat(document.getElementById('aAxisSpeed').value);
+            const maxDepth = parseFloat(document.getElementById('maxDepthOfCut').value);
+            const feedPerTooth = parseFloat(document.getElementById('feedPerTooth').value);
+            
+            // Sort points by Z coordinate
+            const sortedPoints = [...points].sort((a, b) => a.z - b.z);
+            
+            let gcode = [];
+            gcode.push('%');
+            gcode.push('(CYLINDRICAL PROFILE)');
+            gcode.push(`(TOOL DIAMETER: ${toolDia})`);
+            gcode.push(`(SPINDLE RPM: ${spindleRPM})`);
+            gcode.push(`(A-AXIS SPEED: ${aAxisSpeed} deg/min)`);
+            gcode.push('');
+            gcode.push('G90 G94 G17 G91.1');
+            gcode.push('G20');
+            gcode.push('G53 G0 Z-0.5');
+            gcode.push('');
+            gcode.push('T1 M6');
+            gcode.push(`S${spindleRPM} M3`);
+            gcode.push('G54');
+            gcode.push('M8');
+            gcode.push('');
+            
+            // Calculate number of passes needed
+            const maxRadius = Math.max(...sortedPoints.map(p => p.x));
+            const numPasses = Math.ceil(maxRadius / maxDepth);
+            
+            gcode.push(`(TOTAL PASSES: ${numPasses})`);
+            gcode.push('');
+            
+            // Generate toolpath for each pass
+            for (let pass = 1; pass <= numPasses; pass++) {
+                const currentDepth = Math.min(pass * maxDepth, maxRadius);
+                
+                gcode.push(`(PASS ${pass} - DEPTH: ${currentDepth.toFixed(4)})`);
+                
+                // Move to start position
+                const startPoint = sortedPoints[0];
+                gcode.push(`G0 X${startPoint.x.toFixed(4)} Z${startPoint.z.toFixed(4)}`);
+                gcode.push('G0 A0.000');
+                
+                // Calculate feed rate (simplified for now)
+                const avgRadius = currentDepth;
+                const surfaceSpeed = aAxisSpeed * (2 * Math.PI * avgRadius / 360);
+                const feedRate = Math.max(1, surfaceSpeed * 0.5);
+                
+                // Start rotation and cutting
+                gcode.push(`F${feedRate.toFixed(1)}`);
+                
+                // Follow profile while rotating A-axis
+                for (let i = 0; i < sortedPoints.length; i++) {
+                    const p = sortedPoints[i];
+                    const targetX = Math.min(p.x, currentDepth);
+                    gcode.push(`G1 X${targetX.toFixed(4)} Z${p.z.toFixed(4)} A${aAxisSpeed.toFixed(3)}`);
+                }
+                
+                gcode.push('');
+            }
+            
+            // Retract and finish
+            gcode.push('G0 Z1.0');
+            gcode.push('G0 A0.000');
+            gcode.push('M5');
+            gcode.push('M9');
+            gcode.push('G53 G0 Z-0.5');
+            gcode.push('M30');
+            gcode.push('%');
+            
+            generatedGCode = gcode.join('\n');
+            
+            alert(`G-code generated!\nTotal passes: ${numPasses}\nClick Download to save.`);
+            document.getElementById('downloadBtn').disabled = false;
+        }
+        
+        function downloadGCode() {
+            if (!generatedGCode) return;
+            
+            const blob = new Blob([generatedGCode], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'cylindrical_profile.nc';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // Initial draw
+        drawGrid();
+    </script>
+</body>
+</html>
