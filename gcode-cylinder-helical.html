@@ -376,7 +376,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Helical Pattern Duplicator</h1>
+        <h1>Helical Pattern Duplicator Debug</h1>
         <p class="subtitle">Upload a G-code file with a helical toolpath and duplicate it around a cylinder with optimized A-axis motion</p>
         
         <div class="section">
@@ -642,23 +642,32 @@
                 }
             }
             
+            console.log('DEBUG: minCuttingZ =', minCuttingZ);
+            console.log('DEBUG: lastLowZIndex =', lastLowZIndex);
+            console.log('DEBUG: Looking for Z > ', minCuttingZ + 0.1);
+            
             // Find the first Z move that retracts significantly upward after cutting
             let footerStartIndex = -1;
             for (let zm of zMoves) {
                 if (zm.index > lastLowZIndex) {
+                    console.log('DEBUG: Checking line', zm.index, 'Z =', zm.value);
                     // If Z moves up by more than 0.1" from cutting depth, it's a retraction
                     if (zm.value > minCuttingZ + 0.1) {
+                        console.log('DEBUG: RETRACTION DETECTED at line', zm.index);
                         footerStartIndex = zm.index;
                         break;
                     }
                 }
             }
             
+            console.log('DEBUG: footerStartIndex =', footerStartIndex);
+            
             // If no retraction found, fall back to M5
             if (footerStartIndex === -1) {
                 for (let i = 0; i < lines.length; i++) {
                     if (lines[i].includes('M5')) {
                         footerStartIndex = i;
+                        console.log('DEBUG: Fell back to M5 at line', i);
                         break;
                     }
                 }
@@ -672,6 +681,10 @@
             const setup = lines.slice(0, firstALineIndex + 1);
             const machining = lines.slice(firstALineIndex + 1, footerStartIndex);
             const footer = lines.slice(footerStartIndex);
+            
+            console.log('DEBUG: Setup lines:', setup.length, '(0 to', firstALineIndex, ')');
+            console.log('DEBUG: Machining lines:', machining.length, '(', firstALineIndex + 1, 'to', footerStartIndex - 1, ')');
+            console.log('DEBUG: Footer starts at line:', footerStartIndex);
             
             // Get A-axis range from machining section only
             const machiningAValues = allALines.filter(a => a.index > firstALineIndex && a.index < footerStartIndex);
