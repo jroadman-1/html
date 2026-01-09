@@ -1832,18 +1832,34 @@ function updateSidebar() {
     noSel.style.display = "none";
     itemEd.style.display = "block";
     sidebarTitle.textContent = "Item Details";
-    document.getElementById("editName").value = item.name;
+    // Only update editName if it doesn't have focus (to allow editing)
+    const editNameField = document.getElementById("editName");
+    if (document.activeElement !== editNameField) {
+      editNameField.value = item.name;
+    }
 
     if (item.type==="rect") {
       rectFields.style.display="block";
       circleFields.style.display="none";
-      document.getElementById("editWidth").value = item.width;
-      document.getElementById("editDepth").value = item.depth;
-      document.getElementById("editRotation").value = ((item.rotation||0)*180/Math.PI).toFixed(2);
+      const editWidth = document.getElementById("editWidth");
+      const editDepth = document.getElementById("editDepth");
+      const editRotation = document.getElementById("editRotation");
+      if (document.activeElement !== editWidth) {
+        editWidth.value = item.width;
+      }
+      if (document.activeElement !== editDepth) {
+        editDepth.value = item.depth;
+      }
+      if (document.activeElement !== editRotation) {
+        editRotation.value = ((item.rotation||0)*180/Math.PI).toFixed(2);
+      }
     } else {
       rectFields.style.display="none";
       circleFields.style.display="block";
-      document.getElementById("editDiameter").value = item.diameter;
+      const editDiameter = document.getElementById("editDiameter");
+      if (document.activeElement !== editDiameter) {
+        editDiameter.value = item.diameter;
+      }
     }
 
     document.querySelectorAll('input[name="editColor"]').forEach(r=>{
@@ -1870,7 +1886,10 @@ function updateSidebar() {
     noSel.style.display = "none";
     doorEd.style.display = "block";
     sidebarTitle.textContent = "Door Details";
-    document.getElementById("editDoorWidth").value = door.width;
+    const editDoorWidth = document.getElementById("editDoorWidth");
+    if (document.activeElement !== editDoorWidth) {
+      editDoorWidth.value = door.width;
+    }
     document.querySelectorAll('input[name="doorSwing"]').forEach(r=>{
       r.checked = (r.value === (door.swing||"none"));
     });
@@ -1883,7 +1902,10 @@ function updateSidebar() {
     noSel.style.display = "none";
     winEd.style.display = "block";
     sidebarTitle.textContent = "Window Details";
-    document.getElementById("editWindowWidth").value = win.width;
+    const editWindowWidth = document.getElementById("editWindowWidth");
+    if (document.activeElement !== editWindowWidth) {
+      editWindowWidth.value = win.width;
+    }
     return;
   }
 
@@ -1893,7 +1915,10 @@ function updateSidebar() {
     noSel.style.display = "none";
     labelEd.style.display = "block";
     sidebarTitle.textContent = "Label Details";
-    document.getElementById("editLabelText").value = label.text;
+    const editLabelText = document.getElementById("editLabelText");
+    if (document.activeElement !== editLabelText) {
+      editLabelText.value = label.text;
+    }
     document.querySelectorAll('input[name="labelSize"]').forEach(r=>{
       r.checked = (r.value === (label.size||"medium"));
     });
