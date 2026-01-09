@@ -634,7 +634,9 @@ function drawGrid(c, toCanvas) {
   const minor = getMinorGridStep();
   c.save();
 
+  const invScale = 1 / Math.sqrt(viewScale);
   c.strokeStyle = "#eee";
+  c.lineWidth = 0.5 * invScale;
   c.beginPath();
   for (let x=0; x<=room.width+1e-6; x+=minor) {
     const p1 = toCanvas(x,0), p2 = toCanvas(x,room.height);
@@ -647,6 +649,7 @@ function drawGrid(c, toCanvas) {
   c.stroke();
 
   c.strokeStyle = "#ccc";
+  c.lineWidth = 0.8 * invScale;
   c.beginPath();
   for (let x=0; x<=room.width+1e-6; x+=major) {
     const p1 = toCanvas(x,0), p2 = toCanvas(x,room.height);
@@ -709,7 +712,8 @@ function drawWallWithOpenings(c, toCanvas, wall, wallDoors, wallWindows) {
   if (cur < 1) segments.push({ start: cur, end: 1 });
 
   const isSelected = (wall.id === selectedWallId);
-  const scaleFactor = Math.sqrt(viewScale);
+  // Use inverse scale so lines get thinner when zooming in
+  const scaleFactor = 1 / Math.sqrt(viewScale);
   let baseInterior = 2;
   let baseExterior = 4;
   let lineWidth;
@@ -743,9 +747,10 @@ function drawWallWithOpenings(c, toCanvas, wall, wallDoors, wallWindows) {
   if (isSelected) {
     const cp1 = toCanvas(wall.x1, wall.y1);
     const cp2 = toCanvas(wall.x2, wall.y2);
+    const invScaleLocal = 1 / Math.sqrt(viewScale);
     c.fillStyle = "#fff";
     c.strokeStyle = "#f00";
-    c.lineWidth = 2;
+    c.lineWidth = 2 * invScaleLocal;
     [cp1,cp2].forEach(pt=>{
       c.beginPath();
       c.arc(pt.x, pt.y, 6, 0, Math.PI*2);
@@ -814,8 +819,9 @@ function drawDoorSymbol(c, toCanvas, wall, door) {
   const endAngle   = baseAngle + direction * sweep;
 
   c.save();
+  const invScale = 1 / Math.sqrt(viewScale);
   c.strokeStyle = "#888";
-  c.lineWidth = 1;
+  c.lineWidth = 1 * invScale;
 
   // Draw the door panel as a thin line to show door position
   c.beginPath();
@@ -825,7 +831,7 @@ function drawDoorSymbol(c, toCanvas, wall, door) {
 
   // Draw the swing arc
   c.strokeStyle = "#444";
-  c.lineWidth = 1.4;
+  c.lineWidth = 1.4 * invScale;
   c.beginPath();
   c.arc(hingeCanvas.x, hingeCanvas.y, leafRadius,
         startAngle, endAngle, direction < 0);
@@ -855,9 +861,10 @@ function drawWindowSymbol(c, toCanvas, wall, win) {
   c.rotate(wallAngle);
 
   const h = 6;
+  const invScale = 1 / Math.sqrt(viewScale);
   c.fillStyle = "#cce6ff";
   c.strokeStyle = (win.id === selectedWindowId ? "#06c" : "#004488");
-  c.lineWidth = 1.5;
+  c.lineWidth = 1.5 * invScale;
   c.beginPath();
   c.rect(-half, -h/2, win.width * s, h);
   c.fill();
@@ -888,9 +895,10 @@ function drawRectItem(c, toCanvas, item) {
   c.translate(center.x, center.y);
   c.rotate(item.rotation || 0);
 
+  const invScale = 1 / Math.sqrt(viewScale);
   c.fillStyle = fillCol;
   c.strokeStyle = (item.id === selectedItemId ? "#06c" : strokeCol);
-  c.lineWidth = (item.id === selectedItemId ? 2 : 1.2);
+  c.lineWidth = (item.id === selectedItemId ? 2 : 1.2) * invScale;
   c.fillRect(-w/2, -h/2, w, h);
   c.strokeRect(-w/2, -h/2, w, h);
 
@@ -921,8 +929,9 @@ function drawCircleItem(c, toCanvas, item) {
   c.arc(center.x, center.y, r, 0, Math.PI*2);
   c.fillStyle = fillCol;
   c.fill();
+  const invScale = 1 / Math.sqrt(viewScale);
   c.strokeStyle = (item.id === selectedItemId ? "#06c" : strokeCol);
-  c.lineWidth = (item.id === selectedItemId ? 2 : 1.2);
+  c.lineWidth = (item.id === selectedItemId ? 2 : 1.2) * invScale;
   c.stroke();
 
   c.fillStyle = "#000";
@@ -963,9 +972,10 @@ function drawLabels(c, toCanvas) {
 
 function drawDimensions(c, toCanvas) {
   c.save();
+  const invScale = 1 / Math.sqrt(viewScale);
   c.strokeStyle = "#999";
   c.fillStyle = "#555";
-  c.lineWidth = 1;
+  c.lineWidth = 1 * invScale;
   c.font = "12px system-ui";
   c.textAlign = "center";
   c.textBaseline = "middle";
@@ -1029,9 +1039,10 @@ function drawWallPreview(c, toCanvas) {
   const p1 = toCanvas(wallDraftStart.x, wallDraftStart.y);
   const p2 = toCanvas(wallPreviewCurrent.x, wallPreviewCurrent.y);
   c.save();
+  const invScale = 1 / Math.sqrt(viewScale);
   c.strokeStyle = "rgba(0,0,0,0.5)";
   c.setLineDash([5,4]);
-  c.lineWidth = 1;
+  c.lineWidth = 1 * invScale;
   c.beginPath();
   c.moveTo(p1.x, p1.y);
   c.lineTo(p2.x, p2.y);
@@ -1044,9 +1055,10 @@ function drawSnapPreview(c, toCanvas) {
   if (toolMode !== "wall" || !currentSnapPoint) return;
   const p = toCanvas(currentSnapPoint.x, currentSnapPoint.y);
   c.save();
+  const invScale = 1 / Math.sqrt(viewScale);
   c.fillStyle = "#ff8800";
   c.strokeStyle = "#cc6600";
-  c.lineWidth = 1.5;
+  c.lineWidth = 1.5 * invScale;
   c.beginPath();
   c.arc(p.x, p.y, 5, 0, Math.PI*2);
   c.fill();
@@ -1069,9 +1081,10 @@ function drawRotateHandle(c, toCanvas, item) {
   const hy = center.y - L*Math.cos(a);
 
   c.save();
+  const invScale = 1 / Math.sqrt(viewScale);
   c.fillStyle = "#fff";
   c.strokeStyle = "#06c";
-  c.lineWidth = 2;
+  c.lineWidth = 2 * invScale;
 
   c.beginPath();
   c.arc(hx, hy, 7, 0, Math.PI*2);
