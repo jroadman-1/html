@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TLG Saddle Compensation Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --grad-a:     #6a75d4;
+    --grad-b:     #9b59d0;
+    --card-bg:    #ffffff;
+    --panel-bg:   #f0f2ff;
+    --border:     #dde0f5;
+    --accent:     #6a75d4;
+    --accent-dk:  #5560c0;
+    --text:       #1e2240;
+    --muted:      #8890b0;
+    --label:      #3a4060;
+    --radius:     16px;
+    --radius-sm:  10px;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, var(--grad-a), var(--grad-b));
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2.5rem 1rem 3rem;
+  }
+
+  .outer {
+    background: var(--card-bg);
+    border-radius: 24px;
+    padding: 2.2rem 2.2rem 2.5rem;
+    width: 100%;
+    max-width: 560px;
+    box-shadow: 0 20px 60px rgba(80,60,160,0.2);
+  }
+
+  /* ── Header ── */
+  h1 {
+    font-size: clamp(1.4rem, 4vw, 1.85rem);
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+    line-height: 1.2;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 0.82rem;
+    font-style: italic;
+    color: var(--muted);
+    margin-top: 0.35rem;
+    margin-bottom: 1.8rem;
+  }
+
+  /* ── Card section ── */
+  .card {
+    background: var(--panel-bg);
+    border-radius: var(--radius);
+    border-left: 3px solid var(--accent);
+    padding: 1.4rem 1.5rem 1.6rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .section-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--accent);
+    border-bottom: 1.5px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.2rem;
+  }
+
+  /* ── Nut field ── */
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+  .field-row label {
+    flex: 1 1 180px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--label);
+  }
+  .input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .input-wrap input {
+    width: 90px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    padding: 0.45rem 0.6rem;
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    text-align: center;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .input-wrap input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(106,117,212,0.12);
+  }
+  .unit {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .hint {
+    font-size: 0.68rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+    font-style: italic;
+  }
+
+  /* ── Strings grid ── */
+  .strings-grid {
+    display: grid;
+    grid-template-columns: 2.5rem 1fr 1fr;
+    gap: 0;
+  }
+  .strings-grid .th {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    padding: 0.4rem 0.4rem 0.6rem;
+    border-bottom: 1.5px solid var(--border);
+    text-align: center;
+  }
+  .strings-grid .th:first-child { text-align: left; }
+
+  .string-row { display: contents; }
+  .string-row > * {
+    padding: 0.5rem 0.4rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    transition: background 0.1s;
+  }
+  .string-row:hover > * { background: rgba(106,117,212,0.04); }
+  .string-row:last-child > * { border-bottom: none; }
+
+  .string-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .cents-cell { justify-content: center; }
+  .cents-cell input {
+    width: 72px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    padding: 0.35rem 0.4rem;
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    text-align: center;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .cents-cell input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(106,117,212,0.12);
+  }
+
+  /* keep spinners visible */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+  }
+
+  .comp-cell { justify-content: center; }
+  .comp-badge {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 0.3rem 0.6rem;
+    min-width: 82px;
+    text-align: center;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+  }
+  .comp-badge.active {
+    color: var(--accent-dk);
+    border-color: var(--accent);
+    background: rgba(106,117,212,0.08);
+  }
+
+  /* ── Formula note ── */
+  .formula-note {
+    margin-top: 1.1rem;
+    padding: 0.75rem 1rem;
+    background: rgba(106,117,212,0.07);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    font-size: 0.68rem;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+  .formula-note code {
+    color: var(--accent-dk);
+    font-weight: 600;
+  }
+
+  /* ── Clear button ── */
+  .btn-row { text-align: right; margin-top: 1rem; }
+  .btn-clear {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    background: none;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-clear:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    font-size: 0.62rem;
+    color: rgba(106,117,212,0.5);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+  }
+</style>
+</head>
+<body>
+<div class="outer">
+
+  <h1>TLG Saddle Compensation<br>Calculator</h1>
+  <p class="subtitle">Saddle Break Point Adjustment</p>
+
+  <!-- Nut to 1st Fret -->
+  <div class="card">
+    <div class="section-label">Scale Reference</div>
+    <div class="field-row">
+      <label>Distance: Nut → 1st Fret</label>
+      <div class="input-wrap">
+        <input type="number" id="nutFret" value="1.42" step="0.001" min="0" placeholder="1.420">
+        <span class="unit">&Prime; (inches)</span>
+      </div>
+    </div>
+    <p class="hint">Measure from the front face of the nut to the center of the 1st fret.</p>
+  </div>
+
+  <!-- String table -->
+  <div class="card">
+    <div class="section-label">String Compensation</div>
+
+    <div class="strings-grid">
+      <div class="th">String</div>
+      <div class="th">Cents Sharp</div>
+      <div class="th">Move Back</div>
+
+      <div class="string-row">
+        <div class="string-name">E</div>
+        <div class="cents-cell"><input type="number" class="cents" data-string="0" value="0" step="0.5"></div>
+        <div class="comp-cell"><div class="comp-badge" id="comp-0">&mdash;</div></div>
+      </div>
+      <div class="string-row">
+        <div class="string-name">A</div>
+        <div class="cents-cell"><input type="number" class="cents" data-string="1" value="0" step="0.5"></div>
+        <div class="comp-cell"><div class="comp-badge" id="comp-1">&mdash;</div></div>
+      </div>
+      <div class="string-row">
+        <div class="string-name">D</div>
+        <div class="cents-cell"><input type="number" class="cents" data-string="2" value="0" step="0.5"></div>
+        <div class="comp-cell"><div class="comp-badge" id="comp-2">&mdash;</div></div>
+      </div>
+      <div class="string-row">
+        <div class="string-name">G</div>
+        <div class="cents-cell"><input type="number" class="cents" data-string="3" value="0" step="0.5"></div>
+        <div class="comp-cell"><div class="comp-badge" id="comp-3">&mdash;</div></div>
+      </div>
+      <div class="string-row">
+        <div class="string-name">B</div>
+        <div class="cents-cell"><input type="number" class="cents" data-string="4" value="0" step="0.5"></div>
+        <div class="comp-cell"><div class="comp-badge" id="comp-4">&mdash;</div></div>
+      </div>
+      <div class="string-row">
+        <div class="string-name">e</div>
+        <div class="cents-cell"><input type="number" class="cents" data-string="5" value="0" step="0.5"></div>
+        <div class="comp-cell"><div class="comp-badge" id="comp-5">&mdash;</div></div>
+      </div>
+    </div>
+
+    <div class="formula-note">
+      <strong>Formula:</strong>
+      <code>compensation&Prime; = cents_sharp &times; (nut&#8209;to&#8209;1st / 100)</code><br>
+      Move the saddle break point <em>back</em> (toward the tailpiece) by the computed distance.
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-clear" id="clearBtn">Clear All</button>
+    </div>
+  </div>
+
+  <footer>TLG Compensation Method</footer>
+</div>
+
+<script>
+  const nutInput    = document.getElementById('nutFret');
+  const centsInputs = document.querySelectorAll('.cents');
+
+  function fmt(val) {
+    if (isNaN(val)) return '—';
+    return val.toFixed(4) + '\u2033';
+  }
+
+  function calcAll() {
+    const nut = parseFloat(nutInput.value);
+    centsInputs.forEach(inp => {
+      const idx   = inp.dataset.string;
+      const cents = parseFloat(inp.value);
+      const cell  = document.getElementById('comp-' + idx);
+      if (isNaN(nut) || isNaN(cents) || nut <= 0) {
+        cell.textContent = '—';
+        cell.classList.remove('active');
+        return;
+      }
+      const comp = cents * (nut / 100);
+      cell.textContent = fmt(comp);
+      cell.classList.toggle('active', comp > 0);
+    });
+  }
+
+  nutInput.addEventListener('input', calcAll);
+  centsInputs.forEach(inp => inp.addEventListener('input', calcAll));
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    centsInputs.forEach(inp => { inp.value = '0'; });
+    calcAll();
+  });
+
+  calcAll();
+</script>
+</body>
+</html>
