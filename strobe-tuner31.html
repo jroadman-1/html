@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Strobe Tuner 31</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0a;
+    color: #e8dcc8;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* top: fixed bar + safe area  sides/bottom: safe area */
+    padding-top:    max(56px, calc(env(safe-area-inset-top)    + 46px));
+    padding-bottom: max(16px,      env(safe-area-inset-bottom));
+    padding-left:   max(12px,      env(safe-area-inset-left));
+    padding-right:  max(12px,      env(safe-area-inset-right));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #top-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    top: env(safe-area-inset-top, 0);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    padding-left:  max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+    background: rgba(10,10,10,0.95);
+    border-bottom: 1px solid #222;
+    z-index: 10;
+  }
+
+  #device-select {
+    background: #111;
+    color: #999;
+    border: 1px solid #444;
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    max-width: 180px;
+  }
+
+  #device-select:focus { outline: none; border-color: #666; }
+
+  #signal-indicator {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #333;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+
+  #signal-indicator.listening { background: #555; }
+  #signal-indicator.reading   { background: #4a8; }
+
+  #status-text {
+    font-size: 12px;
+    color: #555;
+    letter-spacing: 0.08em;
+  }
+
+  #main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+  }
+
+  #note-display {
+    font-size: clamp(36px, 12vw, 52px);
+    font-weight: bold;
+    letter-spacing: -0.02em;
+    color: #f0e8d0;
+    text-shadow: 0 0 20px rgba(240,232,208,0.3);
+    min-width: 100px;
+    text-align: center;
+    line-height: 1;
+  }
+
+  #note-display.dim { color: #333; text-shadow: none; }
+
+  /* Canvas container sized by JS */
+  #strobe-container {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  #strobe-canvas { border-radius: 50%; display: block; }
+
+  #center-overlay {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  #cents-display {
+    font-size: clamp(22px, 7vw, 32px);
+    font-weight: bold;
+    color: #888;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  #cents-display.dim     { color: #222; }
+  #cents-display.in-tune { color: #4a8; text-shadow: 0 0 10px rgba(68,170,136,0.4); }
+
+  #freq-display {
+    font-size: clamp(11px, 3vw, 14px);
+    color: #555;
+    margin-top: 6px;
+    letter-spacing: 0.04em;
+  }
+
+  #freq-display.active { color: #777; }
+
+  /* TRUE reading — lower-right */
+  #corner-display {
+    position: absolute;
+    bottom: 5%; right: 6%;
+    text-align: right;
+    pointer-events: none;
+  }
+
+  #corner-label {
+    font-size: 9px;
+    color: #444;
+    letter-spacing: 0.15em;
+    margin-bottom: 3px;
+  }
+
+  #corner-cents {
+    font-size: clamp(16px, 5vw, 24px);
+    font-weight: bold;
+    color: #aaa;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  #corner-cents.dim     { color: #252525; }
+  #corner-cents.in-tune { color: #4a8; text-shadow: 0 0 8px rgba(68,170,136,0.35); }
+
+  /* Sample count — lower-left */
+  #sample-display {
+    position: absolute;
+    bottom: 5%; left: 6%;
+    text-align: left;
+    pointer-events: none;
+  }
+
+  #sample-label {
+    font-size: 9px;
+    color: #333;
+    letter-spacing: 0.15em;
+    margin-bottom: 3px;
+  }
+
+  #sample-val {
+    font-size: clamp(10px, 3vw, 13px);
+    color: #336;
+    letter-spacing: 0.04em;
+    transition: color 0.2s;
+  }
+
+  #sample-val.active { color: #66a; }
+  #sample-val.good   { color: #4a8; }
+
+  #start-btn {
+    background: #1a1a1a;
+    color: #e8dcc8;
+    border: 1px solid #444;
+    padding: 14px 36px;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    border-radius: 3px;
+    text-transform: uppercase;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  #start-btn:hover  { background: #222; border-color: #666; }
+  #start-btn:active { background: #2a2a2a; }
+
+  /* Tune bar — width set by JS */
+  #tune-bar {
+    height: 4px;
+    background: #111;
+    border-radius: 2px;
+    position: relative;
+    overflow: visible;
+    flex-shrink: 0;
+  }
+
+  #tune-needle {
+    position: absolute;
+    top: -6px;
+    width: 3px; height: 16px;
+    background: #555;
+    border-radius: 1px;
+    transform: translateX(-50%);
+    left: 50%;
+    transition: left 0.12s;
+  }
+
+  #tune-needle.in-tune {
+    background: #4a8;
+    box-shadow: 0 0 8px rgba(68,170,136,0.6);
+  }
+
+  #tune-bar-center {
+    position: absolute;
+    top: -4px; left: 50%;
+    transform: translateX(-50%);
+    width: 2px; height: 12px;
+    background: #333;
+    border-radius: 1px;
+  }
+
+  /* ── Controls ── */
+  #controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  #sliders {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+  }
+
+  .ctrl-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ctrl-label {
+    font-size: 13px;
+    color: #999;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+  }
+
+  .ctrl-group input[type=range] {
+    -webkit-appearance: none;
+    width: clamp(90px, 25vw, 120px);
+    height: 5px;
+    background: #3a3a3a;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .ctrl-group input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #888;
+    cursor: pointer;
+    border: 2px solid #555;
+    transition: background 0.15s;
+  }
+
+  .ctrl-group input[type=range]:active::-webkit-slider-thumb {
+    background: #bbb;
+  }
+
+  .ctrl-val {
+    font-size: 15px;
+    font-weight: bold;
+    color: #ccc;
+    min-width: 44px;
+    text-align: center;
+  }
+
+  /* ── Radio buttons ── */
+  #reset-group {
+    display: flex;
+    gap: 28px;
+    align-items: center;
+  }
+
+  .radio-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #888;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    text-transform: uppercase;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    padding: 6px 0;   /* larger tap target */
+  }
+
+  .radio-label input[type=radio] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #555;
+    background: #111;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+
+  .radio-label input[type=radio]:checked {
+    border-color: #4a8;
+  }
+
+  .radio-label input[type=radio]:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #4a8;
+  }
+
+  .radio-label.selected { color: #ccc; }
+</style>
+</head>
+<body>
+
+<div id="top-bar">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div id="signal-indicator"></div>
+    <select id="device-select"><option value="">— select input —</option></select>
+  </div>
+  <div id="status-text">CLICK START</div>
+</div>
+
+<div id="main">
+  <div id="note-display" class="dim">—</div>
+
+  <div id="strobe-container">
+    <canvas id="strobe-canvas"></canvas>
+
+    <div id="center-overlay">
+      <div id="cents-display" class="dim">—</div>
+      <div id="freq-display">— Hz</div>
+    </div>
+
+    <div id="corner-display">
+      <div id="corner-label">TRUE</div>
+      <div id="corner-cents" class="dim">—</div>
+    </div>
+
+    <div id="sample-display">
+      <div id="sample-label">SAMPLES</div>
+      <div id="sample-val">—</div>
+    </div>
+  </div>
+
+  <div id="tune-bar">
+    <div id="tune-bar-center"></div>
+    <div id="tune-needle"></div>
+  </div>
+
+  <div id="controls">
+    <div id="sliders">
+      <div class="ctrl-group">
+        <span class="ctrl-label">Ring Speed</span>
+        <input type="range" id="ring-speed" min="0.1" max="2" step="0.1" value="1">
+        <span class="ctrl-val" id="ring-speed-val">1.0</span>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Reject</span>
+        <input type="range" id="reject-slider" min="2" max="15" step="0.5" value="3.5">
+        <span class="ctrl-val" id="reject-val">3.5¢</span>
+      </div>
+    </div>
+
+    <div id="reset-group">
+      <label class="radio-label selected" id="lbl-pluck">
+        <input type="radio" name="reset-mode" value="pluck" checked>
+        Each Pluck
+      </label>
+      <label class="radio-label" id="lbl-note">
+        <input type="radio" name="reset-mode" value="note">
+        Note Change
+      </label>
+    </div>
+  </div>
+
+  <button id="start-btn">Start Tuner</button>
+</div>
+
+<script>
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const NOTE_NAMES          = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const A4                  = 440.0;
+const BUFFER_SIZE         = 4096;
+const AMPLITUDE_GATE      = 0.008;
+const YIN_THRESHOLD       = 0.10;
+const CENTS_IN_TUNE       = 0.8;
+const NOTE_CONFIRM_FRAMES = 3;
+const EMA_ALPHA           = 0.15;
+const TRUE_BUFFER_MAX     = 600;
+const TRUE_MIN_SAMPLES    = 10;
+
+// Ring definitions: widthRatio is ring width as a fraction of OUTER_R.
+// Recomputed into .width on every canvas resize.
+const RINGS = [
+  { segments: 18, speedMul: 1, widthRatio: 50 / 200 },
+  { segments: 36, speedMul: 2, widthRatio: 36 / 200 },
+];
+
+// ─── Responsive canvas geometry (updated by resizeCanvas) ─────────────────────
+
+const canvas    = document.getElementById('strobe-canvas');
+const ctx2d     = canvas.getContext('2d');
+const container = document.getElementById('strobe-container');
+const tuneBar   = document.getElementById('tune-bar');
+
+let CX, CY, OUTER_R;
+
+function resizeCanvas() {
+  // Fit within viewport width minus body side-padding, capped at 420px.
+  const size = Math.min(420, window.innerWidth - 24);
+  canvas.width  = size;
+  canvas.height = size;
+  container.style.width  = size + 'px';
+  container.style.height = size + 'px';
+  tuneBar.style.width    = size + 'px';
+  CX      = size / 2;
+  CY      = size / 2;
+  OUTER_R = size / 2 - Math.round(size * 0.024);   // ~10px margin at 420px
+  RINGS.forEach(r => { r.width = Math.round(r.widthRatio * OUTER_R); });
+  // Redraw immediately so there's no blank frame on resize.
+  drawStrobe(0, false);
+}
+
+window.addEventListener('resize', resizeCanvas);
+// Initial sizing happens after DOM references are set up (end of script).
+
+// ─── Slider / radio state ─────────────────────────────────────────────────────
+
+let ringSpeed    = 1.0;
+let rejectThresh = 3.5;
+let resetMode    = 'pluck';
+
+// ─── Audio / processing state ─────────────────────────────────────────────────
+
+let audioCtx   = null;
+let analyser   = null;
+let sourceNode = null;
+let buffer     = new Float32Array(BUFFER_SIZE);
+let running    = false;
+let rafId      = null;
+
+let pendingNote       = null;
+let pendingNoteFrames = 0;
+let lastNote          = null;
+let refFreq           = 0;
+
+let wasAboveGate  = false;
+let emaCents      = null;
+let trueBuffer    = [];
+let cornerCents   = null;
+let signalPresent = false;
+let holdTimer     = 0;
+
+let ringAngles    = RINGS.map(() => 0);
+let lastFrameTime = null;
+
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
+
+const noteEl          = document.getElementById('note-display');
+const centsEl         = document.getElementById('cents-display');
+const freqEl          = document.getElementById('freq-display');
+const cornerCentsEl   = document.getElementById('corner-cents');
+const sampleValEl     = document.getElementById('sample-val');
+const startBtn        = document.getElementById('start-btn');
+const deviceSel       = document.getElementById('device-select');
+const sigIndicator    = document.getElementById('signal-indicator');
+const statusText      = document.getElementById('status-text');
+const tuneNeedle      = document.getElementById('tune-needle');
+const ringSpeedSlider = document.getElementById('ring-speed');
+const ringSpeedVal    = document.getElementById('ring-speed-val');
+const rejectSlider    = document.getElementById('reject-slider');
+const rejectVal       = document.getElementById('reject-val');
+const lblPluck        = document.getElementById('lbl-pluck');
+const lblNote         = document.getElementById('lbl-note');
+
+ringSpeedSlider.addEventListener('input', () => {
+  ringSpeed = parseFloat(ringSpeedSlider.value);
+  ringSpeedVal.textContent = ringSpeed.toFixed(1);
+});
+
+rejectSlider.addEventListener('input', () => {
+  rejectThresh = parseFloat(rejectSlider.value);
+  rejectVal.textContent = rejectThresh % 1 === 0
+    ? rejectThresh + '¢'
+    : rejectThresh.toFixed(1) + '¢';
+});
+
+document.querySelectorAll('input[name=reset-mode]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    resetMode = radio.value;
+    lblPluck.classList.toggle('selected', resetMode === 'pluck');
+    lblNote.classList.toggle('selected',  resetMode === 'note');
+  });
+});
+
+// ─── YIN pitch detector ───────────────────────────────────────────────────────
+
+function yin(buf, sampleRate) {
+  const half = Math.floor(buf.length / 2);
+  const d    = new Float32Array(half);
+  for (let tau = 1; tau < half; tau++) {
+    let s = 0;
+    for (let j = 0; j < half; j++) {
+      const diff = buf[j] - buf[j + tau];
+      s += diff * diff;
+    }
+    d[tau] = s;
+  }
+  const cmnd = new Float32Array(half);
+  cmnd[0] = 1;
+  let runSum = 0;
+  for (let tau = 1; tau < half; tau++) {
+    runSum += d[tau];
+    cmnd[tau] = d[tau] * tau / runSum;
+  }
+  let tau = -1;
+  for (let t = 2; t < half - 1; t++) {
+    if (cmnd[t] < YIN_THRESHOLD) {
+      while (t + 1 < half && cmnd[t + 1] < cmnd[t]) t++;
+      tau = t;
+      break;
+    }
+  }
+  if (tau === -1) return { freq: -1, confidence: 0 };
+  const x0 = tau > 1 ? tau - 1 : tau;
+  const x2 = tau + 1 < half ? tau + 1 : tau;
+  let betterTau;
+  if (x0 === tau) {
+    betterTau = cmnd[tau] <= cmnd[x2] ? tau : x2;
+  } else if (x2 === tau) {
+    betterTau = cmnd[tau] <= cmnd[x0] ? tau : x0;
+  } else {
+    const denom = 2 * cmnd[tau] - cmnd[x0] - cmnd[x2];
+    betterTau   = denom === 0 ? tau : tau + (cmnd[x2] - cmnd[x0]) / (2 * denom);
+  }
+  return { freq: sampleRate / betterTau, confidence: 1 - cmnd[tau] };
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+function medianOf(arr) {
+  const s = [...arr].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 !== 0 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+function freqToMidi(freq) { return 69 + 12 * Math.log2(freq / A4); }
+function midiToFreq(midi) { return A4 * Math.pow(2, (midi - 69) / 12); }
+
+function nearestNote(freq) {
+  const midi        = freqToMidi(freq);
+  const nearestMidi = Math.round(midi);
+  const octave      = Math.floor((nearestMidi - 12) / 12);
+  const noteIdx     = ((nearestMidi % 12) + 12) % 12;
+  return { noteName: NOTE_NAMES[noteIdx] + octave, etFreq: midiToFreq(nearestMidi) };
+}
+
+function rms(buf) {
+  let s = 0;
+  for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+  return Math.sqrt(s / buf.length);
+}
+
+function computeTrue(buf) {
+  if (buf.length < TRUE_MIN_SAMPLES) return null;
+  const med      = medianOf(buf);
+  const filtered = buf.filter(v => Math.abs(v - med) <= rejectThresh);
+  if (filtered.length < TRUE_MIN_SAMPLES) return null;
+  const mean = filtered.reduce((a, b) => a + b, 0) / filtered.length;
+  return Math.round(mean);
+}
+
+// ─── Renderer ─────────────────────────────────────────────────────────────────
+
+function getRingBounds(i) {
+  let outer = OUTER_R;
+  for (let k = 0; k < i; k++) outer -= RINGS[k].width + 2;
+  return { outer, inner: outer - RINGS[i].width };
+}
+
+function drawStrobe(cents, hasSignal) {
+  ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx2d.beginPath();
+  ctx2d.arc(CX, CY, OUTER_R, 0, Math.PI * 2);
+  ctx2d.fillStyle = '#0d0d0d';
+  ctx2d.fill();
+
+  for (let i = 0; i < RINGS.length; i++) {
+    const { outer, inner } = getRingBounds(i);
+    const segAngle = (Math.PI * 2) / RINGS[i].segments;
+
+    if (!hasSignal) {
+      for (let s = 0; s < RINGS[i].segments; s++) {
+        const a = s * segAngle;
+        ctx2d.beginPath();
+        ctx2d.arc(CX, CY, outer, a, a + segAngle * 0.5);
+        ctx2d.arc(CX, CY, inner, a + segAngle * 0.5, a, true);
+        ctx2d.closePath();
+        ctx2d.fillStyle = '#1c1c1c';
+        ctx2d.fill();
+      }
+    } else {
+      const proximity = Math.max(0, 1 - Math.abs(cents) / 25);
+      const base      = 175 + Math.round(proximity * 60);
+      ctx2d.fillStyle = `rgb(${base},${Math.round(base * 0.88)},${Math.round(base * 0.65)})`;
+      for (let s = 0; s < RINGS[i].segments; s += 2) {
+        const a = s * segAngle + ringAngles[i];
+        ctx2d.beginPath();
+        ctx2d.arc(CX, CY, outer, a, a + segAngle * 0.5);
+        ctx2d.arc(CX, CY, inner, a + segAngle * 0.5, a, true);
+        ctx2d.closePath();
+        ctx2d.fill();
+      }
+    }
+  }
+
+  if (hasSignal && Math.abs(cents) < 2) {
+    const { inner } = getRingBounds(RINGS.length - 1);
+    const alpha     = Math.max(0, (2 - Math.abs(cents)) / 2) * 0.18;
+    const grad      = ctx2d.createRadialGradient(CX, CY, 0, CX, CY, inner + 12);
+    grad.addColorStop(0, `rgba(68,170,136,${alpha})`);
+    grad.addColorStop(1, 'rgba(68,170,136,0)');
+    ctx2d.beginPath();
+    ctx2d.arc(CX, CY, inner + 12, 0, Math.PI * 2);
+    ctx2d.fillStyle = grad;
+    ctx2d.fill();
+  }
+
+  ctx2d.beginPath();
+  ctx2d.arc(CX, CY, OUTER_R, 0, Math.PI * 2);
+  ctx2d.strokeStyle = '#222';
+  ctx2d.lineWidth   = 1.5;
+  ctx2d.stroke();
+}
+
+// ─── Animation loop ───────────────────────────────────────────────────────────
+
+function animate(timestamp) {
+  if (!running) return;
+  rafId = requestAnimationFrame(animate);
+
+  const dt = lastFrameTime === null ? 0 : Math.min((timestamp - lastFrameTime) / 1000, 0.1);
+  lastFrameTime = timestamp;
+
+  analyser.getFloatTimeDomainData(buffer);
+  const amplitude = rms(buffer);
+  const sr        = audioCtx.sampleRate;
+
+  // ── Amplitude gate ──────────────────────────────────────────────────────
+  if (amplitude > AMPLITUDE_GATE) {
+    if (!wasAboveGate && resetMode === 'pluck') {
+      trueBuffer  = [];
+      cornerCents = null;
+    }
+    wasAboveGate  = true;
+    signalPresent = true;
+    holdTimer     = 1.5;
+    sigIndicator.classList.add('listening');
+  } else {
+    wasAboveGate = false;
+    sigIndicator.classList.remove('listening');
+    holdTimer -= dt;
+    if (holdTimer <= 0 && signalPresent) signalPresent = false;
+  }
+
+  // ── Note identification (YIN) ───────────────────────────────────────────
+  let yinFreq = -1, yinConfidence = 0;
+  if (amplitude > AMPLITUDE_GATE) {
+    const result  = yin(buffer, sr);
+    yinFreq       = result.freq;
+    yinConfidence = result.confidence;
+  }
+
+  if (yinConfidence > 0.5 && yinFreq > 50 && yinFreq < 1400) {
+    const { noteName, etFreq } = nearestNote(yinFreq);
+    if (noteName === pendingNote) {
+      pendingNoteFrames++;
+    } else {
+      pendingNote       = noteName;
+      pendingNoteFrames = 1;
+    }
+    if (pendingNoteFrames >= NOTE_CONFIRM_FRAMES && noteName !== lastNote) {
+      lastNote    = noteName;
+      refFreq     = etFreq;
+      emaCents    = null;
+      trueBuffer  = [];
+      cornerCents = null;
+    }
+  }
+
+  // ── EMA → ring + centre ─────────────────────────────────────────────────
+  const validYin = refFreq > 0 && yinConfidence > 0.5 && yinFreq > 50 && yinFreq < 1400;
+
+  if (validYin && amplitude > AMPLITUDE_GATE) {
+    const c = 1200 * Math.log2(yinFreq / refFreq);
+    if (isFinite(c) && Math.abs(c) < 50)
+      emaCents = emaCents === null ? c : emaCents + EMA_ALPHA * (c - emaCents);
+  }
+
+  if (emaCents !== null && amplitude > AMPLITUDE_GATE) {
+    for (let i = 0; i < RINGS.length; i++)
+      ringAngles[i] += emaCents * ringSpeed * 0.1 * dt * RINGS[i].speedMul;
+  }
+
+  // ── TRUE rolling buffer ─────────────────────────────────────────────────
+  if (emaCents !== null && amplitude > AMPLITUDE_GATE) {
+    trueBuffer.push(emaCents);
+    if (trueBuffer.length > TRUE_BUFFER_MAX) trueBuffer.shift();
+    const candidate = computeTrue(trueBuffer);
+    if (candidate !== null) cornerCents = candidate;
+  }
+
+  // ── Draw ────────────────────────────────────────────────────────────────
+  const active    = signalPresent || holdTimer > 0;
+  const ringCents = emaCents !== null ? emaCents : 0;
+  drawStrobe(ringCents, active && lastNote !== null);
+
+  if (lastNote && active) {
+    noteEl.textContent = lastNote;
+    noteEl.classList.remove('dim');
+  } else {
+    noteEl.textContent = '—';
+    noteEl.classList.add('dim');
+  }
+
+  const hasEma = emaCents !== null && active;
+  if (hasEma) {
+    const inTune = Math.abs(emaCents) < CENTS_IN_TUNE;
+    const emaHz  = refFreq * Math.pow(2, emaCents / 1200);
+    centsEl.textContent = (emaCents >= 0 ? '+' : '') + emaCents.toFixed(1) + '¢';
+    centsEl.classList.remove('dim', 'in-tune');
+    if (inTune) centsEl.classList.add('in-tune');
+    freqEl.textContent = emaHz.toFixed(1) + ' Hz';
+    freqEl.classList.add('active');
+  } else {
+    centsEl.textContent = '—';
+    centsEl.classList.add('dim');
+    centsEl.classList.remove('in-tune');
+    freqEl.textContent = '— Hz';
+    freqEl.classList.remove('active');
+  }
+
+  const hasCorner = cornerCents !== null && active;
+  if (hasCorner) {
+    const inTune = Math.abs(cornerCents) < CENTS_IN_TUNE;
+    cornerCentsEl.textContent = (cornerCents >= 0 ? '+' : '') + cornerCents + '¢';
+    cornerCentsEl.classList.remove('dim', 'in-tune');
+    if (inTune) cornerCentsEl.classList.add('in-tune');
+  } else {
+    cornerCentsEl.textContent = '—';
+    cornerCentsEl.classList.add('dim');
+    cornerCentsEl.classList.remove('in-tune');
+  }
+
+  sigIndicator.classList.toggle('reading', cornerCents !== null && active);
+
+  if (active && trueBuffer.length > 0) {
+    const med      = trueBuffer.length >= TRUE_MIN_SAMPLES ? medianOf(trueBuffer) : null;
+    const accepted = med !== null
+      ? trueBuffer.filter(v => Math.abs(v - med) <= rejectThresh).length : 0;
+    sampleValEl.textContent = accepted + ' / ' + trueBuffer.length;
+    sampleValEl.className   = accepted >= TRUE_MIN_SAMPLES ? 'good' : 'active';
+  } else {
+    sampleValEl.textContent = '—';
+    sampleValEl.className   = '';
+  }
+
+  const needleCents  = cornerCents !== null ? cornerCents : (emaCents ?? 0);
+  const needleActive = active && lastNote !== null;
+  if (needleActive) {
+    tuneNeedle.style.left = Math.max(0, Math.min(100, 50 + needleCents)) + '%';
+    tuneNeedle.classList.toggle('in-tune', Math.abs(needleCents) < CENTS_IN_TUNE);
+  } else {
+    tuneNeedle.style.left = '50%';
+    tuneNeedle.classList.remove('in-tune');
+  }
+}
+
+// ─── Audio setup ──────────────────────────────────────────────────────────────
+
+async function populateDevices() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    deviceSel.innerHTML = '';
+    devices.filter(d => d.kind === 'audioinput').forEach(d => {
+      const opt       = document.createElement('option');
+      opt.value       = d.deviceId;
+      opt.textContent = d.label || `Mic ${d.deviceId.slice(0, 6)}`;
+      deviceSel.appendChild(opt);
+    });
+  } catch (e) { console.warn('Device enumeration failed', e); }
+}
+
+async function startAudio() {
+  try {
+    const deviceId = deviceSel.value;
+    const stream   = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId:         deviceId ? { exact: deviceId } : undefined,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl:  false,
+      }
+    });
+
+    audioCtx = new AudioContext();
+    await audioCtx.resume();   // required on iOS after user gesture
+
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize               = BUFFER_SIZE * 2;
+    analyser.smoothingTimeConstant = 0;
+
+    sourceNode = audioCtx.createMediaStreamSource(stream);
+    sourceNode.connect(analyser);
+
+    buffer = new Float32Array(BUFFER_SIZE);
+    await populateDevices();
+
+    running       = true;
+    lastFrameTime = null;
+    startBtn.style.display = 'none';
+    statusText.textContent = 'LISTENING';
+    rafId = requestAnimationFrame(animate);
+  } catch (e) {
+    statusText.textContent = 'MIC ACCESS DENIED';
+    console.error(e);
+  }
+}
+
+deviceSel.addEventListener('change', async () => {
+  if (!running) return;
+  running = false;
+  cancelAnimationFrame(rafId);
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  await startAudio();
+});
+
+startBtn.addEventListener('click', startAudio);
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+resizeCanvas();   // size canvas before first draw
+</script>
+</body>
+</html>
