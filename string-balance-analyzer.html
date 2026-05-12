@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>String Volume Balance Analyzer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: #090909;
+  color: #c8b89a;
+  font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 16px;
+  padding: 0 18px;
+  background: #111;
+  border-bottom: 1px solid #2a2a2a;
+  height: 54px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+.ctrl-sep {
+  width: 1px;
+  height: 28px;
+  background: #2e2e2e;
+  flex-shrink: 0;
+}
+
+label {
+  color: #888;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+select {
+  background: #1a1a1a;
+  border: 1px solid #484840;
+  color: #c8b89a;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  max-width: 220px;
+}
+select:focus { outline: none; border-color: #7a6a50; }
+
+button {
+  background: #1a1a1a;
+  border: 1px solid #484840;
+  color: #c8b89a;
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+button:hover { background: #252520; color: #e8d8b0; border-color: #7a6a50; }
+button.active { background: #2a1e08; border-color: #9a7830; color: #f0c060; }
+button.start-active { background: #0e1e0e; border-color: #3a7a3a; color: #70d070; }
+button.danger { color: #c07070; border-color: #5a3030; }
+button.danger:hover { background: #220f0f; color: #f08080; border-color: #804040; }
+
+.slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 88px;
+  height: 3px;
+  background: #383830;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #a89060;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+input[type="range"]::-webkit-slider-thumb:hover { background: #e8c870; }
+
+.val-label {
+  color: #a09070;
+  font-size: 12px;
+  min-width: 50px;
+  text-align: right;
+}
+
+#status {
+  margin-left: auto;
+  color: #555;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+#status.active    { color: #70b070; }
+#status.measuring { color: #d4a840; }
+#status.error     { color: #c07070; }
+
+#captureChips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cap-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.cap-chip-swatch {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.cap-chip-label {
+  color: #c8b89a;
+  font-size: 11px;
+}
+
+.cap-chip-del {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 0 0 3px;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.cap-chip-del:hover { color: #f08080; background: none; border: none; }
+
+#canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 54px);
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: ns-resize;
+}
+
+#tooltip {
+  position: absolute;
+  background: rgba(14,14,14,0.92);
+  border: 1px solid #333;
+  color: #c8b89a;
+  font-size: 10px;
+  padding: 5px 9px;
+  border-radius: 2px;
+  pointer-events: none;
+  display: none;
+  white-space: nowrap;
+}
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <div class="ctrl-group">
+    <label>Input</label>
+    <select id="deviceSelect"><option value="">Default</option></select>
+  </div>
+
+  <div class="ctrl-sep"></div>
+
+  <div class="ctrl-group">
+    <button id="startBtn">Start</button>
+  </div>
+
+  <div class="ctrl-sep"></div>
+
+  <div class="ctrl-group">
+    <label>Sensitivity</label>
+    <div class="slider-wrap">
+      <input type="range" id="sensitivity" min="-24" max="24" value="0" step="1">
+      <span class="val-label" id="sensVal">+0 dB</span>
+    </div>
+  </div>
+
+  <div class="ctrl-group">
+    <label>Gate</label>
+    <div class="slider-wrap">
+      <input type="range" id="gate" min="-70" max="-20" value="-42" step="1">
+      <span class="val-label" id="gateVal">-42 dB</span>
+    </div>
+  </div>
+
+  <div class="ctrl-sep"></div>
+
+  <button id="captureBtn">Capture</button>
+
+  <div class="ctrl-sep" id="capSep" style="display:none"></div>
+  <div id="captureChips"></div>
+
+  <button id="resetBtn" class="danger" style="margin-left:auto">Reset</button>
+  <span id="status">Stopped</span>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="canvas"></canvas>
+  <div id="tooltip"></div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const A4              = 440.0;
+const NOTE_NAMES      = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const MIN_FREQ        = 28;    // below low B on a 5-string bass
+const MAX_FREQ        = 1400;
+const MIN_DB          = -60;
+const MAX_DB          = 0;
+const YIN_BUF_SIZE    = 8192;  // ~186ms at 44100 — covers E1 (41 Hz, ~5 cycles)
+const YIN_THRESHOLD   = 0.10;
+const MIN_CONFIDENCE  = 0.72;
+const ATTACK_IGNORE_MS = 160;  // ignore this window after onset
+const GATE_HYSTERESIS  = 6;    // dB below gate before going idle again
+const PEAK_HOLD_MS    = 2200;
+const CAPTURE_PALETTE = [
+  { line: 'rgba(232,136,58,0.9)',  swatch: '#e88840' },  // rust
+  { line: 'rgba(58,200,184,0.9)',  swatch: '#3ac8b8' },  // teal
+  { line: 'rgba(168,120,232,0.9)', swatch: '#a878e8' },  // lavender
+  { line: 'rgba(100,200,100,0.9)', swatch: '#64c864' },  // sage
+  { line: 'rgba(232,100,152,0.9)', swatch: '#e86498' },  // rose
+  { line: 'rgba(200,200,58,0.9)',  swatch: '#c8c83a' },  // gold
+  { line: 'rgba(72,160,232,0.9)',  swatch: '#48a0e8' },  // sky
+  { line: 'rgba(232,80,80,0.9)',   swatch: '#e85050' },  // red
+];
+const BAR_DECAY_DB    = 0.35;  // dB lost per animation frame (~21 dB/sec at 60fps)
+const PEAK_DECAY      = 0.9985;
+const MARGIN          = { top: 28, right: 28, bottom: 72, left: 52 };
+
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+// Per note entry:
+//   key, name, freq, midi
+//   count, sumDb, avgDb, peakDb
+//   barDb        — displayed bar height (ballistic)
+//   peakHoldDb   — peak hold display value
+//   peakHoldTime — timestamp of last peak update
+const noteMap = new Map();
+
+let captures     = [];     // [{id, label, color, lineColor, points}]
+let captureSeq   = 0;
+let referenceDb  = -18;    // draggable reference line
+let sensitivityDb = 0;
+let gateDb       = -42;
+
+// Audio
+let audioCtx  = null;
+let processor = null;
+let stream    = null;
+let isRunning = false;
+let sampleRate = 44100;
+
+// Signal state machine: IDLE | ATTACK | MEASURING
+let sigState     = 'IDLE';
+let onsetTime    = 0;
+let yinAccum     = new Float32Array(YIN_BUF_SIZE);
+let yinFill      = 0;
+let peakInWindow = 0;
+
+// UI
+let isDraggingRef = false;
+
+// ═══════════════════════════════════════════════════════════
+//  YIN PITCH DETECTOR  (same implementation as strobe-tuner31)
+// ═══════════════════════════════════════════════════════════
+function yin(buf, sr) {
+  const half = Math.floor(buf.length / 2);
+  const d    = new Float32Array(half);
+
+  for (let tau = 1; tau < half; tau++) {
+    let s = 0;
+    for (let j = 0; j < half; j++) {
+      const diff = buf[j] - buf[j + tau];
+      s += diff * diff;
+    }
+    d[tau] = s;
+  }
+
+  const cmnd = new Float32Array(half);
+  cmnd[0] = 1;
+  let runSum = 0;
+  for (let tau = 1; tau < half; tau++) {
+    runSum += d[tau];
+    cmnd[tau] = d[tau] * tau / runSum;
+  }
+
+  let tau = -1;
+  for (let t = 2; t < half - 1; t++) {
+    if (cmnd[t] < YIN_THRESHOLD) {
+      while (t + 1 < half && cmnd[t + 1] < cmnd[t]) t++;
+      tau = t;
+      break;
+    }
+  }
+  if (tau === -1) return { freq: -1, confidence: 0 };
+
+  const x0 = tau > 1       ? tau - 1 : tau;
+  const x2 = tau + 1 < half ? tau + 1 : tau;
+  let betterTau;
+  if (x0 === tau) {
+    betterTau = cmnd[tau] <= cmnd[x2] ? tau : x2;
+  } else if (x2 === tau) {
+    betterTau = cmnd[tau] <= cmnd[x0] ? tau : x0;
+  } else {
+    const denom = 2 * cmnd[tau] - cmnd[x0] - cmnd[x2];
+    betterTau   = denom === 0 ? tau : tau + (cmnd[x2] - cmnd[x0]) / (2 * denom);
+  }
+  return { freq: sr / betterTau, confidence: 1 - cmnd[tau] };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  NOTE UTILITIES
+// ═══════════════════════════════════════════════════════════
+function freqToMidi(f)  { return Math.round(69 + 12 * Math.log2(f / A4)); }
+function midiToFreq(m)  { return A4 * Math.pow(2, (m - 69) / 12); }
+function midiToName(m)  {
+  const pc  = ((m % 12) + 12) % 12;
+  const oct = Math.floor(m / 12) - 1;
+  return NOTE_NAMES[pc] + oct;
+}
+function linToDb(lin)   { return lin > 0 ? 20 * Math.log10(lin) : -120; }
+
+// ═══════════════════════════════════════════════════════════
+//  AUDIO PROCESSING
+// ═══════════════════════════════════════════════════════════
+function processChunk(samples) {
+  let rmsSum = 0;
+  let peak   = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const a = Math.abs(samples[i]);
+    rmsSum += a * a;
+    if (a > peak) peak = a;
+  }
+  const rms   = Math.sqrt(rmsSum / samples.length);
+  const rmsDb = linToDb(rms);
+  const now   = performance.now();
+
+  // Effective threshold (sensitivity offsets displayed dB, not the gate)
+  const effectiveGate = gateDb;
+
+  if (sigState === 'IDLE') {
+    if (rmsDb > effectiveGate) {
+      sigState     = 'ATTACK';
+      onsetTime    = now;
+      yinFill      = 0;
+      peakInWindow = 0;
+    }
+
+  } else if (sigState === 'ATTACK') {
+    // Collect signal during attack window (to track decay back to idle)
+    if (rmsDb < effectiveGate - GATE_HYSTERESIS) {
+      sigState = 'IDLE'; // false trigger / too short
+    } else if (now - onsetTime >= ATTACK_IGNORE_MS) {
+      sigState = 'MEASURING';
+      setStatusEl('measuring');
+    }
+
+  } else if (sigState === 'MEASURING') {
+    // Track amplitude
+    if (peak > peakInWindow) peakInWindow = peak;
+
+    // Fill YIN buffer
+    const space  = YIN_BUF_SIZE - yinFill;
+    const toCopy = Math.min(samples.length, space);
+    yinAccum.set(samples.subarray(0, toCopy), yinFill);
+    yinFill += toCopy;
+
+    if (yinFill >= YIN_BUF_SIZE) {
+      commitDetection();
+      sigState = 'COOLDOWN'; // wait for signal to drop before allowing next onset
+      setStatusEl('active');
+      return;
+    }
+
+    // Signal dropped mid-measurement — analyse what we have if enough
+    if (rmsDb < effectiveGate - GATE_HYSTERESIS && yinFill >= YIN_BUF_SIZE / 4) {
+      commitDetection();
+      sigState = 'IDLE'; // signal already gone, safe to re-arm immediately
+      setStatusEl('active');
+    }
+
+  } else if (sigState === 'COOLDOWN') {
+    // Hold off re-triggering until the string actually stops ringing
+    if (rmsDb < effectiveGate - GATE_HYSTERESIS) {
+      sigState = 'IDLE';
+    }
+  }
+}
+
+function commitDetection() {
+  if (yinFill < 1024) return;
+
+  const buf    = yinAccum.subarray(0, yinFill);
+  const result = yin(buf, sampleRate);
+  if (!result || result.freq <= 0) return;
+
+  const { freq, confidence } = result;
+  if (confidence < MIN_CONFIDENCE)            return;
+  if (freq < MIN_FREQ || freq > MAX_FREQ)     return;
+
+  const midi     = freqToMidi(freq);
+  const trueFreq = midiToFreq(midi);
+  const name     = midiToName(midi);
+
+  // Amplitude in dBFS + sensitivity offset
+  const peakDb = linToDb(peakInWindow) + sensitivityDb;
+  if (peakDb < MIN_DB + 3) return; // below display floor
+
+  const now = performance.now();
+  const key = name; // "E2", "A2", etc.
+
+  if (!noteMap.has(key)) {
+    noteMap.set(key, {
+      key, name, freq: trueFreq, midi,
+      count: 0, sumDb: 0, avgDb: peakDb, peakDb,
+      barDb: peakDb,
+      peakHoldDb: peakDb, peakHoldTime: now
+    });
+  }
+
+  const e = noteMap.get(key);
+  e.count++;
+  e.sumDb  += peakDb;
+  e.avgDb   = e.sumDb / e.count;
+  if (peakDb > e.peakDb) e.peakDb = peakDb;
+
+  // Visual: jump bar to this pluck's level
+  if (peakDb > e.barDb) e.barDb = peakDb;
+
+  // Peak hold
+  if (peakDb >= e.peakHoldDb) {
+    e.peakHoldDb   = peakDb;
+    e.peakHoldTime = now;
+  }
+
+  console.log(`[detected] ${name} ${trueFreq.toFixed(1)} Hz  peak=${peakDb.toFixed(1)} dB  conf=${confidence.toFixed(2)}  avg=${e.avgDb.toFixed(1)} dB  n=${e.count}`);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AUDIO SETUP
+// ═══════════════════════════════════════════════════════════
+async function startAudio(deviceId) {
+  try {
+    const constraints = {
+      audio: {
+        deviceId:           deviceId ? { exact: deviceId } : undefined,
+        echoCancellation:   false,
+        noiseSuppression:   false,
+        autoGainControl:    false,
+        channelCount:       1
+      }
+    };
+    stream    = await navigator.mediaDevices.getUserMedia(constraints);
+    audioCtx  = new (window.AudioContext || window.webkitAudioContext)();
+    sampleRate = audioCtx.sampleRate;
+
+    const source = audioCtx.createMediaStreamSource(stream);
+
+    // ScriptProcessor for sample-level access
+    processor = audioCtx.createScriptProcessor(256, 1, 1);
+    processor.onaudioprocess = (e) => {
+      processChunk(e.inputBuffer.getChannelData(0));
+    };
+
+    // Connect but silence the output (avoid feedback)
+    const silencer = audioCtx.createGain();
+    silencer.gain.value = 0;
+    source.connect(processor);
+    processor.connect(silencer);
+    silencer.connect(audioCtx.destination);
+
+    isRunning = true;
+    setStatusEl('active');
+  } catch (err) {
+    console.error(err);
+    setStatusEl('error');
+    document.getElementById('status').textContent = err.message.slice(0, 40);
+  }
+}
+
+function stopAudio() {
+  if (processor)  { processor.disconnect(); processor = null; }
+  if (audioCtx)   { audioCtx.close(); audioCtx = null; }
+  if (stream)     { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  isRunning = false;
+  sigState  = 'IDLE';
+  setStatusEl('');
+}
+
+async function populateDevices() {
+  try {
+    const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+    tmp.getTracks().forEach(t => t.stop());
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs  = devices.filter(d => d.kind === 'audioinput');
+    const sel     = document.getElementById('deviceSelect');
+    sel.innerHTML = '';
+    inputs.forEach(d => {
+      const opt       = document.createElement('option');
+      opt.value       = d.deviceId;
+      opt.textContent = d.label || ('Input ' + d.deviceId.slice(0, 8));
+      sel.appendChild(opt);
+    });
+  } catch (_) { /* no permission yet — will populate on Start */ }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CANVAS & COORDINATE SYSTEM
+// ═══════════════════════════════════════════════════════════
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+let dpr = window.devicePixelRatio || 1;
+let W, H, GL, GT, GR, GB, GW, GH;
+
+function resizeCanvas() {
+  dpr = window.devicePixelRatio || 1;
+  const wrap = document.getElementById('canvas-wrap');
+  W = wrap.clientWidth;
+  H = wrap.clientHeight;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  GL = MARGIN.left   * dpr;
+  GT = MARGIN.top    * dpr;
+  GR = (W - MARGIN.right)  * dpr;
+  GB = (H - MARGIN.bottom) * dpr;
+  GW = GR - GL;
+  GH = GB - GT;
+}
+
+function freqToX(f) {
+  return GL + Math.log(f / MIN_FREQ) / Math.log(MAX_FREQ / MIN_FREQ) * GW;
+}
+function dbToY(db) {
+  const t = (Math.max(MIN_DB, Math.min(MAX_DB, db)) - MIN_DB) / (MAX_DB - MIN_DB);
+  return GB - t * GH;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER LOOP
+// ═══════════════════════════════════════════════════════════
+function render() {
+  requestAnimationFrame(render);
+  const now = performance.now();
+
+  // Background
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#090909';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawGrid();
+
+  // Sorted notes for connection line
+  const sorted = [...noteMap.values()].sort((a, b) => a.freq - b.freq);
+
+  // Update ballistics
+  for (const e of sorted) {
+    // Bar: pure ballistic — decays to floor regardless of avgDb
+    e.barDb = Math.max(MIN_DB, e.barDb - BAR_DECAY_DB);
+    // All-time peak hold: decay after hold period
+    if (now - e.peakHoldTime > PEAK_HOLD_MS) {
+      e.peakHoldDb = e.peakHoldDb * PEAK_DECAY + MIN_DB * (1 - PEAK_DECAY);
+    }
+  }
+
+  // Draw bars
+  for (const e of sorted) drawBar(e);
+
+  // Captured reference lines (oldest first, so newest is on top)
+  for (const cap of captures) {
+    if (cap.points.length >= 2) {
+      drawConnLine(cap.points, cap.lineColor, true, cap.label);
+    }
+  }
+
+  // Live connection line
+  if (sorted.length >= 2) {
+    const pts = sorted.map(e => ({ freq: e.freq, db: e.avgDb, name: e.name }));
+    drawConnLine(pts, 'rgba(235,220,175,0.9)', false);
+  }
+
+  drawReferenceGrid();
+  drawAxesLabels();
+  drawReferenceLine();
+}
+
+// ─── Grid ──────────────────────────────────────────────────
+function drawGrid() {
+  // Horizontal dB grid lines
+  ctx.lineWidth = 1;
+  for (let db = MIN_DB; db <= MAX_DB; db += 6) {
+    const y = dbToY(db);
+    ctx.strokeStyle = db === 0 ? '#303028' : '#1c1c18';
+    ctx.beginPath();
+    ctx.moveTo(GL, y);
+    ctx.lineTo(GR, y);
+    ctx.stroke();
+  }
+
+  // Vertical freq grid lines
+  const gridFreqs = [
+    31.7, 41.2, 55, 73.4, 82.4, 110, 130.8, 164.8, 196, 220,
+    261.6, 329.6, 392, 440, 523.3, 659.3, 880, 1046.5
+  ];
+  for (const f of gridFreqs) {
+    if (f < MIN_FREQ || f > MAX_FREQ) continue;
+    const x = freqToX(f);
+    ctx.strokeStyle = '#151515';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, GT);
+    ctx.lineTo(x, GB);
+    ctx.stroke();
+  }
+
+  // Graph border
+  ctx.strokeStyle = '#252520';
+  ctx.lineWidth   = 1;
+  ctx.strokeRect(GL, GT, GW, GH);
+}
+
+function drawReferenceGrid() {
+  // subtle fill zones: nothing needed — clean look is better
+}
+
+function drawAxesLabels() {
+  const sz = 9 * dpr;
+
+  // dB labels (left axis)
+  ctx.font         = `${sz}px monospace`;
+  ctx.textAlign    = 'right';
+  ctx.textBaseline = 'middle';
+  for (let db = MIN_DB; db <= MAX_DB; db += 6) {
+    const y = dbToY(db);
+    ctx.fillStyle = db === 0 ? '#6a6a58' : '#4a4a3c';
+    ctx.fillText(db + '', GL - 5 * dpr, y);
+  }
+
+  // dBFS axis label (rotated)
+  ctx.save();
+  ctx.translate(10 * dpr, (GT + GB) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle    = '#464638';
+  ctx.font         = `${sz}px monospace`;
+  ctx.fillText('dBFS', 0, 0);
+  ctx.restore();
+
+  // X axis note labels at standard reference positions
+  const axisLabels = [
+    { f: 41.2,  n: 'E1' }, { f: 55.0,   n: 'A1' },
+    { f: 82.4,  n: 'E2' }, { f: 110.0,  n: 'A2' },
+    { f: 130.8, n: 'C3' }, { f: 164.8,  n: 'E3' },
+    { f: 220.0, n: 'A3' }, { f: 261.6,  n: 'C4' },
+    { f: 329.6, n: 'E4' }, { f: 440.0,  n: 'A4' },
+    { f: 523.3, n: 'C5' }, { f: 659.3,  n: 'E5' },
+    { f: 880.0, n: 'A5' }, { f: 1046.5, n: 'C6' },
+  ];
+
+  ctx.font         = `${9 * dpr}px monospace`;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'top';
+
+  for (const { f, n } of axisLabels) {
+    if (f < MIN_FREQ || f > MAX_FREQ) continue;
+    const x = freqToX(f);
+
+    // Tick
+    ctx.strokeStyle = '#3a3a30';
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, GB);
+    ctx.lineTo(x, GB + 5 * dpr);
+    ctx.stroke();
+
+    // Note name
+    ctx.fillStyle = '#504840';
+    ctx.fillText(n, x, GB + 6 * dpr);
+
+    // Hz
+    ctx.fillStyle = '#383028';
+    ctx.fillText(Math.round(f), x, GB + 17 * dpr);
+  }
+}
+
+// ─── Bar ──────────────────────────────────────────────────
+function drawBar(e) {
+  const x  = freqToX(e.freq);
+  const bw = Math.max(20 * dpr, GW * 0.017);
+
+  // ── 1. Ballistic bar (live pluck activity) ──
+  const yBar = dbToY(e.barDb);
+  const barH = GB - yBar;
+  if (barH > 1) {
+    const t    = (e.barDb - MIN_DB) / (MAX_DB - MIN_DB);
+    const grad = ctx.createLinearGradient(0, yBar, 0, GB);
+    const hue  = 36 + t * 14;
+    grad.addColorStop(0,   `hsla(${hue + 8}, 75%, ${52 + t * 14}%, 0.80)`);
+    grad.addColorStop(0.5, `hsla(${hue},     65%, 38%, 0.65)`);
+    grad.addColorStop(1,   `hsla(${hue - 4}, 50%, 22%, 0.45)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(x - bw / 2, yBar, bw, barH);
+  }
+
+  // ── 2. Averaged-peak marker — the held reference ──
+  // This is what the connection line is drawn through.
+  // Bright, prominent, always visible regardless of bar state.
+  const yAvg = dbToY(e.avgDb);
+  const mExt = 5 * dpr; // marker extends beyond bar edges
+
+  // Filled pill behind the marker line for legibility
+  ctx.fillStyle = 'rgba(20,16,8,0.7)';
+  ctx.fillRect(x - bw / 2 - mExt, yAvg - 3 * dpr, bw + mExt * 2, 6 * dpr);
+
+  // Marker line
+  ctx.strokeStyle = 'rgba(240,200,90,0.95)';
+  ctx.lineWidth   = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(x - bw / 2 - mExt, yAvg);
+  ctx.lineTo(x + bw / 2 + mExt, yAvg);
+  ctx.stroke();
+
+  // ── 3. All-time peak tick (highest single pluck) ──
+  if (e.peakHoldDb > e.avgDb + 0.5) {
+    const yPk = dbToY(e.peakHoldDb);
+    ctx.strokeStyle = 'rgba(200,190,160,0.45)';
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([3 * dpr, 3 * dpr]);
+    ctx.beginPath();
+    ctx.moveTo(x - bw / 2, yPk);
+    ctx.lineTo(x + bw / 2, yPk);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ── 4. dB value label — positioned above avg marker ──
+  ctx.font         = `${10 * dpr}px monospace`;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillStyle    = 'rgba(230,195,100,0.9)';
+  ctx.fillText(e.avgDb.toFixed(1), x, yAvg - 5 * dpr);
+
+  // ── 5. Note labels at bar base ──
+  const labelY = GB - 5 * dpr;
+  ctx.font         = `bold ${11 * dpr}px monospace`;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillStyle    = '#c8b080';
+  ctx.fillText(e.name, x, labelY);
+
+  ctx.font      = `${9 * dpr}px monospace`;
+  ctx.fillStyle = '#6a5a38';
+  ctx.fillText(Math.round(e.freq) + ' Hz', x, labelY - 13 * dpr);
+
+  ctx.fillStyle = '#40382a';
+  ctx.fillText('n=' + e.count, x, labelY - 24 * dpr);
+}
+
+// ─── Connection line ───────────────────────────────────────
+function drawConnLine(pts, color, dashed, label) {
+  if (pts.length < 2) return;
+  const s = [...pts].sort((a, b) => a.freq - b.freq);
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = dashed ? 1.5 : 2.5;
+  ctx.lineJoin    = 'round';
+  ctx.setLineDash(dashed ? [7 * dpr, 5 * dpr] : []);
+
+  ctx.beginPath();
+  for (let i = 0; i < s.length; i++) {
+    const x = freqToX(s[i].freq);
+    const y = dbToY(s[i].db);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Node dots
+  for (const p of s) {
+    const x = freqToX(p.freq);
+    const y = dbToY(p.db);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, (dashed ? 3 : 4) * dpr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Label at the right-most point
+  if (label) {
+    const last = s[s.length - 1];
+    const x = freqToX(last.freq) + 8 * dpr;
+    const y = dbToY(last.db);
+    ctx.font         = `${10 * dpr}px monospace`;
+    ctx.textAlign    = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle    = color;
+    ctx.fillText(label, x, y);
+  }
+}
+
+// ─── Reference line ────────────────────────────────────────
+function drawReferenceLine() {
+  const y = dbToY(referenceDb);
+
+  ctx.strokeStyle = 'rgba(90,140,200,0.4)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([7 * dpr, 5 * dpr]);
+  ctx.beginPath();
+  ctx.moveTo(GL, y);
+  ctx.lineTo(GR, y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Label
+  ctx.font         = `${9 * dpr}px monospace`;
+  ctx.textAlign    = 'left';
+  ctx.textBaseline = 'bottom';
+  ctx.fillStyle    = 'rgba(90,140,200,0.55)';
+  ctx.fillText('ref  ' + referenceDb + ' dB', GL + 5 * dpr, y - 3 * dpr);
+
+  // Drag handle on right edge
+  const hx = GR - 22 * dpr;
+  const hy = y - 6 * dpr;
+  ctx.fillStyle = 'rgba(60,100,160,0.3)';
+  ctx.fillRect(hx, hy, 22 * dpr, 12 * dpr);
+  ctx.fillStyle = 'rgba(100,160,240,0.5)';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('≡', hx + 11 * dpr, y);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  REFERENCE LINE DRAG
+// ═══════════════════════════════════════════════════════════
+function yToDb(py) {
+  const t = 1 - (py * dpr - GT) / GH;
+  return Math.round(Math.max(MIN_DB, Math.min(MAX_DB, MIN_DB + t * (MAX_DB - MIN_DB))));
+}
+
+function isNearRefLine(pyCSS) {
+  const refPx = dbToY(referenceDb); // physical pixels
+  return Math.abs(pyCSS * dpr - refPx) < 12 * dpr;
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (isNearRefLine(e.offsetY)) isDraggingRef = true;
+});
+canvas.addEventListener('mousemove', e => {
+  canvas.style.cursor = isNearRefLine(e.offsetY) ? 'ns-resize' : 'default';
+  if (!isDraggingRef) return;
+  referenceDb = yToDb(e.offsetY);
+});
+canvas.addEventListener('mouseup',    () => { isDraggingRef = false; });
+canvas.addEventListener('mouseleave', () => { isDraggingRef = false; });
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  if (isNearRefLine(t.clientY - rect.top)) isDraggingRef = true;
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  if (!isDraggingRef) return;
+  e.preventDefault();
+  const t    = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  referenceDb = yToDb(t.clientY - rect.top);
+}, { passive: false });
+canvas.addEventListener('touchend', () => { isDraggingRef = false; });
+
+// ═══════════════════════════════════════════════════════════
+//  UI
+// ═══════════════════════════════════════════════════════════
+function setStatusEl(cls) {
+  const el = document.getElementById('status');
+  el.className = cls;
+  el.textContent = cls === 'active' ? 'Listening' :
+                   cls === 'measuring' ? 'Measuring' :
+                   cls === 'error'     ? 'Error' :
+                                        'Stopped';
+}
+
+document.getElementById('startBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('startBtn');
+  if (isRunning) {
+    stopAudio();
+    btn.textContent = 'Start';
+    btn.classList.remove('start-active');
+  } else {
+    // Populate devices on first click (guarantees permission)
+    await populateDevices();
+    btn.textContent = 'Stop';
+    btn.classList.add('start-active');
+    const devId = document.getElementById('deviceSelect').value;
+    await startAudio(devId);
+  }
+});
+
+document.getElementById('captureBtn').addEventListener('click', () => {
+  if (noteMap.size === 0) return;
+  const palette = CAPTURE_PALETTE[captureSeq % CAPTURE_PALETTE.length];
+  captureSeq++;
+  const id    = captureSeq;
+  const label = 'C' + id;
+  const cap   = {
+    id,
+    label,
+    lineColor: palette.line,
+    swatchColor: palette.swatch,
+    points: [...noteMap.values()]
+      .sort((a, b) => a.freq - b.freq)
+      .map(e => ({ freq: e.freq, db: e.avgDb, name: e.name }))
+  };
+  captures.push(cap);
+  renderCaptureChips();
+
+  const btn = document.getElementById('captureBtn');
+  btn.classList.add('active');
+  setTimeout(() => btn.classList.remove('active'), 600);
+});
+
+function deleteCapture(id) {
+  captures = captures.filter(c => c.id !== id);
+  renderCaptureChips();
+}
+
+function renderCaptureChips() {
+  const container = document.getElementById('captureChips');
+  const sep       = document.getElementById('capSep');
+  container.innerHTML = '';
+  sep.style.display = captures.length ? 'block' : 'none';
+  for (const cap of captures) {
+    const chip = document.createElement('div');
+    chip.className = 'cap-chip';
+    chip.innerHTML =
+      `<span class="cap-chip-swatch" style="background:${cap.swatchColor}"></span>` +
+      `<span class="cap-chip-label">${cap.label}</span>` +
+      `<button class="cap-chip-del" title="Delete ${cap.label}">×</button>`;
+    chip.querySelector('.cap-chip-del').addEventListener('click', () => deleteCapture(cap.id));
+    container.appendChild(chip);
+  }
+}
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Clear all measurements and all captured lines?')) return;
+  noteMap.clear();
+  captures     = [];
+  captureSeq   = 0;
+  sigState     = 'IDLE';
+  yinFill      = 0;
+  peakInWindow = 0;
+  renderCaptureChips();
+});
+
+document.getElementById('sensitivity').addEventListener('input', e => {
+  sensitivityDb = parseFloat(e.target.value);
+  document.getElementById('sensVal').textContent =
+    (sensitivityDb >= 0 ? '+' : '') + sensitivityDb + ' dB';
+});
+
+document.getElementById('gate').addEventListener('input', e => {
+  gateDb = parseFloat(e.target.value);
+  document.getElementById('gateVal').textContent = gateDb + ' dB';
+});
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+render();
+
+// Try to enumerate devices without triggering a permission prompt
+navigator.mediaDevices.enumerateDevices().then(devices => {
+  const inputs = devices.filter(d => d.kind === 'audioinput' && d.label);
+  if (inputs.length > 0) {
+    const sel = document.getElementById('deviceSelect');
+    sel.innerHTML = '';
+    inputs.forEach(d => {
+      const opt       = document.createElement('option');
+      opt.value       = d.deviceId;
+      opt.textContent = d.label;
+      sel.appendChild(opt);
+    });
+  }
+}).catch(() => {});
+</script>
+</body>
+</html>
