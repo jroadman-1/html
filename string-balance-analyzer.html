@@ -587,6 +587,9 @@ async function startAudio(deviceId) {
 
     isRunning = true;
     setStatusEl('active');
+    // Permission now granted — re-enumerate so dropdown shows proper device labels,
+    // and preserve whichever device was just selected.
+    populateDevices(deviceId);
   } catch (err) {
     console.error(err);
     setStatusEl('error');
@@ -603,21 +606,30 @@ function stopAudio() {
   setStatusEl('');
 }
 
-async function populateDevices() {
+async function populateDevices(preserveSelection) {
   try {
-    const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
-    tmp.getTracks().forEach(t => t.stop());
+    // If audio isn't running yet, request permission so devices come back with labels.
+    // Once running, permission is already held — no need to ask again.
+    if (!isRunning) {
+      const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+      tmp.getTracks().forEach(t => t.stop());
+    }
     const devices = await navigator.mediaDevices.enumerateDevices();
     const inputs  = devices.filter(d => d.kind === 'audioinput');
+    if (inputs.length === 0) return;
     const sel     = document.getElementById('deviceSelect');
+    const current = preserveSelection || sel.value;
     sel.innerHTML = '';
-    inputs.forEach(d => {
+    inputs.forEach((d, i) => {
       const opt       = document.createElement('option');
       opt.value       = d.deviceId;
-      opt.textContent = d.label || ('Input ' + d.deviceId.slice(0, 8));
+      opt.textContent = d.label || ('Input ' + (i + 1));
       sel.appendChild(opt);
     });
-  } catch (_) { /* no permission yet — will populate on Start */ }
+    if (current && [...sel.options].some(o => o.value === current)) {
+      sel.value = current;
+    }
+  } catch (_) {}
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1017,13 +1029,23 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     btn.textContent = 'Start';
     btn.classList.remove('start-active');
   } else {
-    // Populate devices on first click (guarantees permission)
-    await populateDevices();
     btn.textContent = 'Stop';
     btn.classList.add('start-active');
     const devId = document.getElementById('deviceSelect').value;
     await startAudio(devId);
   }
+});
+
+document.getElementById('deviceSelect').addEventListener('change', async () => {
+  if (!isRunning) return;
+  const devId = document.getElementById('deviceSelect').value;
+  // Restart stream on new device — leave measurements and button state untouched
+  if (processor)  { processor.disconnect(); processor = null; }
+  if (audioCtx)   { audioCtx.close(); audioCtx = null; }
+  if (stream)     { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  isRunning = false;
+  sigState  = 'IDLE';
+  await startAudio(devId);
 });
 
 document.getElementById('captureBtn').addEventListener('click', () => {
@@ -1106,20 +1128,11 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 render();
 
-// Try to enumerate devices without triggering a permission prompt
-navigator.mediaDevices.enumerateDevices().then(devices => {
-  const inputs = devices.filter(d => d.kind === 'audioinput' && d.label);
-  if (inputs.length > 0) {
-    const sel = document.getElementById('deviceSelect');
-    sel.innerHTML = '';
-    inputs.forEach(d => {
-      const opt       = document.createElement('option');
-      opt.value       = d.deviceId;
-      opt.textContent = d.label;
-      sel.appendChild(opt);
-    });
-  }
-}).catch(() => {});
+// Populate devices immediately on load — user sees the full list before clicking Start
+populateDevices();
+
+// Re-populate if the user plugs/unplugs an interface
+navigator.mediaDevices.addEventListener('devicechange', populateDevices);
 </script>
 </body>
 </html>
