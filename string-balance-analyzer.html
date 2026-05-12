@@ -264,8 +264,8 @@ const MAX_FREQ        = 1400;
 const MIN_DB          = -60;
 const MAX_DB          = 0;
 const YIN_BUF_SIZE    = 8192;  // ~186ms at 44100 — covers E1 (41 Hz, ~5 cycles)
-const YIN_THRESHOLD   = 0.10;
-const MIN_CONFIDENCE  = 0.72;
+const YIN_THRESHOLD   = 0.13;
+const MIN_CONFIDENCE  = 0.66;
 const ATTACK_IGNORE_MS = 160;  // ignore this window after onset
 const GATE_HYSTERESIS  = 6;    // dB below gate before going idle again
 const PEAK_HOLD_MS    = 2200;
@@ -281,6 +281,10 @@ const CAPTURE_PALETTE = [
 ];
 const BAR_DECAY_DB    = 0.35;  // dB lost per animation frame (~21 dB/sec at 60fps)
 const PEAK_DECAY      = 0.9985;
+const IQR_MIN         = 5;     // readings needed before outlier rejection activates
+const IQR_FENCE       = 1.5;   // standard Tukey multiplier
+const IQR_FLOOR_DB    = 1.5;   // minimum IQR width — prevents over-rejection on tight clusters
+const REJECT_FLASH_MS = 900;
 const MARGIN          = { top: 28, right: 28, bottom: 72, left: 52 };
 
 // ═══════════════════════════════════════════════════════════
@@ -377,6 +381,26 @@ function midiToName(m)  {
 }
 function linToDb(lin)   { return lin > 0 ? 20 * Math.log10(lin) : -120; }
 
+// ─── IQR outlier filter ────────────────────────────────────
+// Returns the subset of readings that fall within the Tukey fences.
+// With fewer than IQR_MIN readings, returns all of them unchanged.
+function acceptedReadings(readings) {
+  if (readings.length < IQR_MIN) return readings.slice();
+  const s = [...readings].sort((a, b) => a - b);
+  const n = s.length;
+  const lerp = p => {
+    const i = p * (n - 1), lo = Math.floor(i), hi = Math.ceil(i);
+    return s[lo] + (s[hi] - s[lo]) * (i - lo);
+  };
+  const q1  = lerp(0.25);
+  const q3  = lerp(0.75);
+  const iqr = Math.max(q3 - q1, IQR_FLOOR_DB);
+  const lo  = q1 - IQR_FENCE * iqr;
+  const hi  = q3 + IQR_FENCE * iqr;
+  const ok  = readings.filter(r => r >= lo && r <= hi);
+  return ok.length > 0 ? ok : readings.slice(); // never return empty
+}
+
 // ═══════════════════════════════════════════════════════════
 //  AUDIO PROCESSING
 // ═══════════════════════════════════════════════════════════
@@ -400,11 +424,13 @@ function processChunk(samples) {
       sigState     = 'ATTACK';
       onsetTime    = now;
       yinFill      = 0;
-      peakInWindow = 0;
+      peakInWindow = 0; // start tracking peak from onset — captures attack transient
     }
 
   } else if (sigState === 'ATTACK') {
-    // Collect signal during attack window (to track decay back to idle)
+    // Track peak during attack window — this is where the loudest moment lives
+    if (peak > peakInWindow) peakInWindow = peak;
+
     if (rmsDb < effectiveGate - GATE_HYSTERESIS) {
       sigState = 'IDLE'; // false trigger / too short
     } else if (now - onsetTime >= ATTACK_IGNORE_MS) {
@@ -430,7 +456,7 @@ function processChunk(samples) {
     }
 
     // Signal dropped mid-measurement — analyse what we have if enough
-    if (rmsDb < effectiveGate - GATE_HYSTERESIS && yinFill >= YIN_BUF_SIZE / 4) {
+    if (rmsDb < effectiveGate - GATE_HYSTERESIS && yinFill >= 1024) {
       commitDetection();
       sigState = 'IDLE'; // signal already gone, safe to re-arm immediately
       setStatusEl('active');
@@ -457,7 +483,7 @@ function commitDetection() {
   for (let i = 0; i < numWindows; i++) {
     const offset = Math.floor((yinFill - WIN) * i / Math.max(numWindows - 1, 1));
     const r = yin(yinAccum.subarray(offset, offset + WIN), sampleRate);
-    if (r && r.freq > 0 && r.confidence >= MIN_CONFIDENCE - 0.08
+    if (r && r.freq > 0 && r.confidence >= MIN_CONFIDENCE - 0.10
         && r.freq >= MIN_FREQ && r.freq <= MAX_FREQ) {
       votes.push(freqToMidi(r.freq));
     }
@@ -489,28 +515,41 @@ function commitDetection() {
   if (!noteMap.has(key)) {
     noteMap.set(key, {
       key, name, freq: trueFreq, midi,
-      count: 0, sumDb: 0, avgDb: peakDb, peakDb,
+      readings: [],          // all raw peak readings
+      count: 0,              // accepted reading count
+      totalCount: 0,         // total plucks including rejected
+      avgDb: peakDb, peakDb,
       barDb: peakDb,
-      peakHoldDb: peakDb, peakHoldTime: now
+      peakHoldDb: peakDb, peakHoldTime: now,
+      rejectFlashTime: 0
     });
   }
 
   const e = noteMap.get(key);
-  e.count++;
-  e.sumDb  += peakDb;
-  e.avgDb   = e.sumDb / e.count;
+  e.readings.push(peakDb);
+  e.totalCount++;
+
+  // Retrospective IQR: re-evaluate the full reading set every time
+  const ok     = acceptedReadings(e.readings);
+  const wasIn  = ok.includes(peakDb); // was this pluck accepted?
+  e.count      = ok.length;
+  e.avgDb      = ok.reduce((a, b) => a + b, 0) / ok.length;
   if (peakDb > e.peakDb) e.peakDb = peakDb;
 
-  // Visual: jump bar to this pluck's level
+  // Visual: jump bar to this pluck's level regardless of outlier status
   if (peakDb > e.barDb) e.barDb = peakDb;
 
-  // Peak hold
-  if (peakDb >= e.peakHoldDb) {
+  // Brief flash if this pluck was rejected
+  if (!wasIn) e.rejectFlashTime = now;
+
+  // Peak hold (accepted plucks only)
+  if (wasIn && peakDb >= e.peakHoldDb) {
     e.peakHoldDb   = peakDb;
     e.peakHoldTime = now;
   }
 
-  console.log(`[detected] ${name} ${trueFreq.toFixed(1)} Hz  peak=${peakDb.toFixed(1)} dB  votes=${bestCount}/${votes.length}  avg=${e.avgDb.toFixed(1)} dB  n=${e.count}`);
+  const tag = wasIn ? 'accepted' : 'REJECTED';
+  console.log(`[${tag}] ${name} ${trueFreq.toFixed(1)} Hz  peak=${peakDb.toFixed(1)} dB  avg=${e.avgDb.toFixed(1)} dB  n=${e.count}/${e.totalCount}`);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -832,8 +871,19 @@ function drawBar(e) {
   ctx.fillStyle = '#6a5a38';
   ctx.fillText(Math.round(e.freq) + ' Hz', x, labelY - 13 * dpr);
 
+  // Show accepted/total — dim the rejected count so it doesn't dominate
+  const rejected = e.totalCount - e.count;
   ctx.fillStyle = '#40382a';
-  ctx.fillText('n=' + e.count, x, labelY - 24 * dpr);
+  ctx.fillText(rejected > 0 ? `n=${e.count}(${rejected}✕)` : `n=${e.count}`, x, labelY - 24 * dpr);
+
+  // Rejection flash — brief red-orange outline when a pluck is thrown out
+  const flashAge = performance.now() - e.rejectFlashTime;
+  if (e.rejectFlashTime > 0 && flashAge < REJECT_FLASH_MS) {
+    const alpha = 1 - flashAge / REJECT_FLASH_MS;
+    ctx.strokeStyle = `rgba(220,80,50,${(alpha * 0.9).toFixed(2)})`;
+    ctx.lineWidth   = 2.5;
+    ctx.strokeRect(x - bw / 2 - 3, GT, bw + 6, GB - GT);
+  }
 }
 
 // ─── Connection line ───────────────────────────────────────
@@ -993,6 +1043,12 @@ document.getElementById('captureBtn').addEventListener('click', () => {
   };
   captures.push(cap);
   renderCaptureChips();
+
+  // Clear live data so the next measurement starts fresh
+  noteMap.clear();
+  sigState     = 'IDLE';
+  yinFill      = 0;
+  peakInWindow = 0;
 
   const btn = document.getElementById('captureBtn');
   btn.classList.add('active');
